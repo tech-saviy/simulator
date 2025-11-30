@@ -3,22 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced PySpark Internals Simulator</title>
+    <title>PySpark Ultimate Simulator v3.0</title>
     <style>
         :root {
-            /* Cyberpunk Palette */
-            --bg-dark: #050505;
-            --bg-panel: #0f1115;
-            --border: #27272a;
-            --neon-blue: #00f3ff;
-            --neon-pink: #ff0055;
-            --neon-green: #00ff9d;
-            --neon-purple: #bc13fe;
-            --neon-orange: #ff9d00;
+            /* Cyberpunk Theme Palette */
+            --bg-dark: #09090b;       
+            --bg-panel: #18181b;      
+            --border: #27272a;        
+            
+            --neon-blue: #06b6d4;     
+            --neon-pink: #f43f5e;     
+            --neon-green: #10b981;    
+            --neon-purple: #8b5cf6;   
+            
             --text-main: #e4e4e7;
             --text-muted: #a1a1aa;
-            --font-code: 'Menlo', 'Monaco', monospace;
-            --font-ui: 'Inter', system-ui, sans-serif;
+            
+            --font-code: 'Menlo', 'Monaco', 'Courier New', monospace;
+            --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
         }
 
         * { box-sizing: border-box; }
@@ -32,67 +34,83 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            user-select: none;
+            -webkit-user-select: none; /* Safari */
+            -ms-user-select: none; /* IE 10 and IE 11 */
+            user-select: none; /* Standard syntax */
         }
 
-        /* HEADER */
+        /* --- HEADER --- */
         header {
             height: 60px;
-            background: rgba(15, 17, 21, 0.95);
+            background: rgba(24, 24, 27, 0.8);
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0 25px;
+            backdrop-filter: blur(10px);
             z-index: 100;
         }
 
         .brand {
             font-size: 1.2rem;
             font-weight: 800;
-            color: var(--neon-blue);
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             display: flex;
             align-items: center;
             gap: 15px;
-            letter-spacing: 1px;
-            text-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
         }
 
+        /* HOME BUTTON STYLING */
         .home-btn {
             text-decoration: none;
             color: var(--text-muted);
             font-size: 0.9rem;
             font-weight: 600;
-            border: 1px solid var(--border);
-            padding: 6px 12px;
-            border-radius: 4px;
-            transition: 0.3s;
             display: flex;
             align-items: center;
             gap: 5px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: 0.3s;
+            border: 1px solid transparent;
         }
         .home-btn:hover {
-            border-color: var(--neon-purple);
-            color: var(--neon-purple);
-            background: rgba(188, 19, 254, 0.1);
-            box-shadow: 0 0 15px rgba(188, 19, 254, 0.2);
+            color: #fff;
+            border-color: var(--text-muted);
+            background: rgba(255,255,255,0.1);
         }
 
-        /* GRID LAYOUT */
+        .header-actions button {
+            background: var(--border);
+            color: var(--text-muted);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .header-actions button:hover { background: var(--neon-purple); color: white; }
+
+        /* --- LAYOUT GRID --- */
         .grid-container {
             display: grid;
-            grid-template-columns: 340px 480px 1fr;
+            grid-template-columns: 320px 450px 1fr;
             flex: 1;
             height: calc(100vh - 60px);
         }
 
+        /* --- PANEL STYLES --- */
         .panel {
             border-right: 1px solid var(--border);
             background: var(--bg-dark);
             display: flex;
             flex-direction: column;
         }
-
         .panel-header {
             padding: 12px 20px;
             font-size: 0.75rem;
@@ -101,186 +119,324 @@
             letter-spacing: 1px;
             color: var(--text-muted);
             border-bottom: 1px solid var(--border);
-            background: var(--bg-panel);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: var(--bg-panel);
         }
 
-        /* CONTROLS */
+        /* --- CONTROLS --- */
         .controls-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
         
+        .control-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
         select {
-            width: 100%; background: var(--bg-panel); color: var(--text-main);
-            border: 1px solid var(--border); padding: 12px; border-radius: 6px;
-            outline: none; cursor: pointer; font-family: var(--font-ui);
+            width: 100%;
+            background: var(--bg-panel);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 6px;
+            font-family: var(--font-ui);
+            cursor: pointer;
+            outline: none;
         }
-        select:hover { border-color: var(--neon-blue); }
-        optgroup { color: var(--neon-purple); font-weight: bold; }
+        select:focus { border-color: var(--neon-blue); }
 
-        .toggle-switch { display: flex; gap: 10px; background: #111; padding: 4px; border-radius: 6px; border: 1px solid var(--border); }
-        .toggle-btn {
-            flex: 1; background: transparent; border: none;
-            color: var(--text-muted); padding: 8px; border-radius: 4px; cursor: pointer; font-weight: 600;
-            transition: 0.3s;
+        .toggle-switch {
+            display: flex;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 4px;
         }
-        .active-bad { background: rgba(255, 0, 85, 0.15); color: var(--neon-pink); text-shadow: 0 0 5px rgba(255,0,85,0.5); }
-        .active-good { background: rgba(0, 255, 157, 0.15); color: var(--neon-green); text-shadow: 0 0 5px rgba(0,255,157,0.5); }
+        .toggle-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .toggle-btn.active-bad { background: rgba(244, 63, 94, 0.15); color: var(--neon-pink); }
+        .toggle-btn.active-good { background: rgba(16, 185, 129, 0.15); color: var(--neon-green); }
 
         .btn-run {
-            width: 100%; padding: 14px; background: var(--neon-blue); color: #000;
-            border: none; border-radius: 6px; font-weight: 800; cursor: pointer;
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2); text-transform: uppercase; letter-spacing: 1px;
+            width: 100%;
+            padding: 14px;
+            background: var(--neon-blue);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-transform: uppercase;
             transition: 0.2s;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
         }
-        .btn-run:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 30px rgba(0, 243, 255, 0.4); }
-        .btn-run:disabled { opacity: 0.4; filter: grayscale(1); cursor: not-allowed; }
+        .btn-run:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 25px rgba(6, 182, 212, 0.5); }
+        .btn-run:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
 
-        .log-box { 
-            flex: 1; background: #080a0c; border: 1px solid var(--border); padding: 12px; 
-            font-family: var(--font-code); font-size: 0.8rem; overflow-y: auto; color: var(--text-muted); 
-            border-radius: 6px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        .log-box {
+            flex: 1;
+            background: #000;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 10px;
+            font-family: var(--font-code);
+            font-size: 0.8rem;
+            overflow-y: auto;
+            color: var(--text-muted);
         }
-        .log-entry { margin-bottom: 8px; border-left: 3px solid #333; padding-left: 10px; line-height: 1.4; animation: fadeIn 0.3s; }
-        .log-entry.info { border-color: var(--neon-blue); color: #fff; }
+        .log-entry { margin-bottom: 6px; padding-left: 8px; border-left: 2px solid #333; }
+        .log-entry.info { border-color: var(--neon-blue); color: var(--text-main); }
         .log-entry.error { border-color: var(--neon-pink); color: var(--neon-pink); }
         .log-entry.success { border-color: var(--neon-green); color: var(--neon-green); }
 
-        /* CENTER PANEL */
-        .code-window { flex: 1; background: #080a0c; padding: 20px; overflow: auto; font-family: var(--font-code); font-size: 0.85rem; line-height: 1.6; color: #a6accd; border-bottom: 1px solid var(--border); }
-        .plan-window { height: 30%; background: var(--bg-panel); padding: 15px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .doc-btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            text-decoration: none;
+            color: var(--neon-purple);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: 0.2s;
+            margin-top: auto; 
+        }
+        .doc-btn:hover { border-color: var(--neon-purple); background: rgba(139, 92, 246, 0.1); }
+
+        /* --- CENTER PANEL --- */
+        .code-window {
+            flex: 1;
+            background: #0e0e11; 
+            overflow: auto;
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            user-select: text; /* Allow code copying */
+        }
+        pre { margin: 0; font-family: var(--font-code); font-size: 0.85rem; line-height: 1.6; color: #a6accd; }
         
+        .kwd { color: #c792ea; font-weight: bold; } 
+        .str { color: #c3e88d; } 
+        .fn { color: #82aaff; } 
+        .com { color: #676e95; font-style: italic; } 
+        .bad-highlight { background: rgba(244, 63, 94, 0.1); border-left: 3px solid var(--neon-pink); padding-left: 10px; display:block; }
+        .good-highlight { background: rgba(16, 185, 129, 0.1); border-left: 3px solid var(--neon-green); padding-left: 10px; display:block; }
+
+        .plan-window {
+            height: 35%;
+            background: var(--bg-panel);
+            padding: 15px;
+            overflow-y: auto;
+        }
         .dag-node {
-            background: #1a1d24; border: 1px solid var(--border); padding: 8px 15px; border-radius: 20px;
-            font-size: 0.75rem; color: var(--text-muted); min-width: 150px; text-align: center; position: relative;
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            color: var(--text-muted);
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            text-align: center;
+            font-family: var(--font-code);
+            font-size: 0.75rem;
+            position: relative;
+            transition: 0.3s;
         }
-        .dag-node::after { content: '↓'; position: absolute; bottom: -18px; left: 50%; color: #333; font-size: 14px; transform: translateX(-50%); }
-        .dag-node:last-child::after { content: ''; }
-        .dag-node.active { border-color: var(--neon-blue); color: #fff; box-shadow: 0 0 15px rgba(0, 243, 255, 0.1); }
+        .dag-node::after { content: '↓'; position: absolute; bottom: -14px; left: 50%; color: #3f3f46; }
+        .dag-node:last-child::after { content: none; }
+        .dag-node.active { border-color: var(--neon-blue); color: #fff; box-shadow: 0 0 10px rgba(6, 182, 212, 0.2); }
 
-        /* CLUSTER VISUALS */
-        .cluster-stage { 
-            flex: 1; background: radial-gradient(circle at 50% 50%, #111 1px, transparent 1px); 
-            background-size: 30px 30px; padding: 30px; display: flex; flex-direction: column; gap: 30px; 
+        /* --- RIGHT PANEL --- */
+        .cluster-stage {
+            flex: 1;
+            background-image: 
+                radial-gradient(circle at 50% 50%, #18181b 1px, transparent 1px);
+            background-size: 20px 20px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
+
+        .driver-node {
+            align-self: center;
+            width: 160px;
+            padding: 15px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 2px solid var(--neon-purple);
+            border-radius: 8px;
+            text-align: center;
+            color: var(--neon-purple);
+            font-weight: 700;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+        }
+
+        .executor-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            flex: 1;
+        }
+
+        .executor {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: 0.3s;
+        }
+        .executor.crashed { border-color: var(--neon-pink); box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); opacity: 0.8; }
+        .executor.crashed::after { content: 'CRASHED'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--neon-pink); font-weight: 900; font-size: 1.5rem; transform: translate(-50%,-50%) rotate(-10deg); border: 4px solid var(--neon-pink); padding: 5px 10px; }
         
-        .driver-node { 
-            align-self: center; width: 200px; padding: 15px; border: 2px solid var(--neon-purple); 
-            text-align: center; border-radius: 8px; color: var(--neon-purple); font-weight: 800;
-            background: rgba(188, 19, 254, 0.05); transition: 0.3s;
+        .executor-header { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: bold; }
+
+        /* Resource Bars */
+        .res-group { margin-bottom: 8px; }
+        .res-meta { display: flex; justify-content: space-between; font-size: 0.65rem; color: #71717a; margin-bottom: 3px; }
+        .res-track { height: 6px; background: #27272a; border-radius: 3px; overflow: hidden; }
+        .res-fill { height: 100%; width: 0%; background: var(--neon-blue); transition: width 0.4s ease, background 0.2s; }
+        
+        .data-pool {
+            flex: 1;
+            border: 1px dashed #3f3f46;
+            border-radius: 4px;
+            margin-top: 10px;
+            position: relative;
+            padding: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 6px;
         }
-        .driver-node.crash { background: var(--neon-pink); color: #000; border-color: var(--neon-pink); box-shadow: 0 0 30px var(--neon-pink); animation: shake 0.5s; }
 
-        .executor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; }
-        .executor { 
-            background: var(--bg-panel); border: 1px solid var(--border); padding: 15px; 
-            border-radius: 8px; display: flex; flex-direction: column; transition: 0.3s; position: relative;
-        }
-        .executor.crashed { border-color: var(--neon-pink); opacity: 0.5; filter: grayscale(1); }
-        .executor.crashed::after { content: 'OOM'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-20deg); color: var(--neon-pink); font-weight: 900; font-size: 2rem; border: 3px solid var(--neon-pink); padding: 5px 15px; }
-
-        .res-bar-container { height: 6px; background: #222; margin-top: 5px; border-radius: 3px; overflow: hidden; }
-        .res-bar { height: 100%; width: 0%; background: var(--neon-blue); transition: 0.4s ease-out; }
-
-        /* DATA BLOCKS */
-        .data-pool { flex: 1; border: 1px dashed #333; margin-top: 15px; padding: 10px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; position: relative; }
-        .block { 
-            width: 30px; height: 30px; background: var(--neon-blue); border-radius: 4px; 
-            display: flex; align-items: center; justify-content: center; font-size: 0.6rem; 
-            color: #000; font-weight: 800; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            transition: all 0.5s;
+        /* Blocks */
+        .block {
+            width: 30px; height: 30px;
+            background: var(--neon-blue);
+            color: #000;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.65rem; font-weight: 800;
+            animation: spawn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.5s ease;
         }
         .block.skew { width: 90px; background: var(--neon-pink); color: white; }
-        .block.salt { background: var(--neon-green); border: 1px solid #fff; }
-        .block.cached { border: 2px solid var(--neon-green); box-shadow: 0 0 10px var(--neon-green); }
-        .block.tiny { width: 15px; height: 15px; font-size: 0; }
-        .block.slow { animation: pulseSlow 1s infinite; background: var(--neon-orange); }
+        .block.salt { background: var(--neon-green); color: white; border: 1px solid #fff; }
+        .block.broadcast { background: var(--neon-green); border: 2px solid #fff; }
+        .block.tiny { width: 14px; height: 14px; font-size: 0; }
+        .block.spill::before { content: '💾'; font-size: 1rem; position: absolute; }
 
-        /* CODE HIGHLIGHTING */
-        .com { color: #676e95; font-style: italic; }
-        .bad-hl { background: rgba(255, 0, 85, 0.1); border-left: 3px solid var(--neon-pink); padding-left: 10px; display: block; }
-        .good-hl { background: rgba(0, 255, 157, 0.1); border-left: 3px solid var(--neon-green); padding-left: 10px; display: block; }
-
-        /* ANIMATIONS */
-        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
-        @keyframes pulseSlow { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes spawn { from { transform: scale(0); } to { transform: scale(1); } }
 
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body oncontextmenu="return false;"> <!-- Basic Right Click Disable -->
 
     <header>
         <div class="brand">
-            <a href="index.html" class="home-btn">🏠 Home</a>
-            <span>⚡ PYSPARK ADVANCED SIMULATOR</span>
+            <!-- Home Button -->
+            <a href="index.html" class="home-btn">
+                <span>🏠</span> Home
+            </a>
+            <span>|</span>
+            <span>⚡</span> PYSPARK SIMULATOR
         </div>
-        <a href="#" onclick="alert('Step-by-step visualization of Spark internals. Select a scenario to begin.')" class="home-btn">Help ?</a>
+        <div class="header-actions">
+            <button onclick="alert('Visualize Spark Internals: Select a scenario to see how code affects the cluster.')">Help</button>
+        </div>
     </header>
 
     <div class="grid-container">
+        
         <!-- LEFT PANEL -->
         <div class="panel">
-            <div class="panel-header">Configuration</div>
+            <div class="panel-header">Control Center</div>
             <div class="controls-body">
-                <label>SELECT SCENARIO</label>
-                <select id="scenarioSelect" onchange="initScenario()">
-                    <optgroup label="Core Concepts">
-                        <option value="lazy">Lazy Evaluation vs Action</option>
-                        <option value="wide">Wide (Shuffle) vs Narrow</option>
-                    </optgroup>
-                    <optgroup label="Common Issues">
-                        <option value="skew">Data Skew (Join OOM)</option>
-                        <option value="execoom">Executor OOM (Explode)</option>
-                        <option value="driveroom">Driver OOM (Collect)</option>
-                    </optgroup>
-                    <optgroup label="Optimization">
-                        <option value="broadcast">Broadcast Join</option>
-                        <option value="cache">Caching & Persistence</option>
-                        <option value="udf">Python UDF vs Pandas UDF</option>
-                    </optgroup>
-                </select>
+                <div class="control-group">
+                    <label>SCENARIO SELECTOR</label>
+                    <select id="scenarioSelect" onchange="initScenario()">
+                        <optgroup label="Architecture">
+                            <option value="lazy">Lazy Evaluation vs Action</option>
+                            <option value="wide">Narrow vs Wide (Shuffle)</option>
+                        </optgroup>
+                        <optgroup label="Joins & Skew">
+                            <option value="skew">Skewed Join (OOM)</option>
+                            <option value="broadcast">Broadcast Join</option>
+                            <option value="cartesian">Cartesian Product</option>
+                        </optgroup>
+                        <optgroup label="Partitioning">
+                            <option value="repartition">Repartition vs Coalesce</option>
+                            <option value="smallfiles">Small Files Problem</option>
+                        </optgroup>
+                        <optgroup label="Memory & Performance">
+                            <option value="driveroom">Driver OOM (Collect)</option>
+                            <option value="execoom">Executor OOM (Explode)</option>
+                            <option value="spill">Disk Spill</option>
+                            <option value="udf">Python UDF vs Pandas</option>
+                        </optgroup>
+                    </select>
+                </div>
 
                 <div class="toggle-switch">
-                    <button id="btnBad" class="toggle-btn active-bad" onclick="setMode('bad')">PROBLEM</button>
-                    <button id="btnGood" class="toggle-btn" onclick="setMode('good')">OPTIMIZED</button>
+                    <button id="btnBad" class="toggle-btn active-bad" onclick="setMode('bad')">⚠️ PROBLEM</button>
+                    <button id="btnGood" class="toggle-btn" onclick="setMode('good')">✅ FIXED</button>
                 </div>
 
                 <button id="runBtn" class="btn-run" onclick="nextStep()">Start Simulation</button>
-                
-                <div class="log-box" id="logger">
-                    <div class="log-entry">System Initialized. Select a scenario.</div>
+
+                <div class="control-group" style="flex:1; display:flex; flex-direction:column;">
+                    <label>EXECUTION LOG</label>
+                    <div class="log-box" id="logger">
+                        <div class="log-entry info">System initialized.</div>
+                    </div>
                 </div>
+
+                <a href="#" id="docLink" target="_blank" class="doc-btn">
+                    📖 Open Official Docs
+                </a>
             </div>
         </div>
 
         <!-- CENTER PANEL -->
         <div class="panel">
-            <div class="panel-header">PySpark Code</div>
+            <div class="panel-header">PySpark Code & Plan</div>
             <div class="code-window" id="codeView"></div>
-            <div class="panel-header">DAG / Execution Plan</div>
-            <div class="plan-window" id="dagView">
-                <!-- DAG Nodes injected here -->
-            </div>
+            <div class="panel-header">Physical Plan (DAG)</div>
+            <div class="plan-window" id="dagView"></div>
         </div>
 
         <!-- RIGHT PANEL -->
         <div class="panel">
-            <div class="panel-header">Cluster Backend</div>
+            <div class="panel-header">Cluster Backend (4 Executors)</div>
             <div class="cluster-stage">
-                <div class="driver-node" id="driver">DRIVER (JVM)</div>
+                <div class="driver-node" id="driver">DRIVER<br><span style="font-size:0.7rem; opacity:0.7;">SparkContext</span></div>
+                
                 <div class="executor-grid">
                     <script>
                         for(let i=0; i<4; i++) {
                             document.write(`
                                 <div class="executor" id="ex${i}">
-                                    <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#888; font-weight:bold;">
-                                        <span>EXECUTOR ${i+1}</span>
-                                        <span>RAM <span id="ram-txt-${i}">0%</span></span>
+                                    <div class="executor-header">
+                                        <span>Executor ${i+1}</span>
+                                        <span>10.0.0.${i+1}</span>
                                     </div>
-                                    <div class="res-bar-container"><div id="bar-${i}" class="res-bar"></div></div>
-                                    <div style="font-size:0.6rem; color:#666; margin-top:3px;">CPU: <span id="cpu-txt-${i}">Idle</span></div>
+                                    <div class="res-group">
+                                        <div class="res-meta"><span>CPU</span><span id="cpu-txt-${i}">0%</span></div>
+                                        <div class="res-track"><div class="res-fill" id="cpu-${i}"></div></div>
+                                    </div>
+                                    <div class="res-group">
+                                        <div class="res-meta"><span>RAM</span><span id="ram-txt-${i}">0%</span></div>
+                                        <div class="res-track"><div class="res-fill" id="ram-${i}"></div></div>
+                                    </div>
                                     <div class="data-pool" id="stage-${i}"></div>
                                 </div>
                             `);
@@ -289,277 +445,13 @@
                 </div>
             </div>
         </div>
+
     </div>
 
+    <!-- PROTECTED SCRIPT BLOCK -->
     <script>
-        // Disable Developer Shortcuts
-        document.onkeydown = function(e) {
-            if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && e.keyCode == 73) || (e.ctrlKey && e.keyCode == 85)) return false;
-        }
+        const _0x9a15f5=_0x4e13;function _0x4e13(_0x58645d,_0x491898){const _0x184c31=_0x184c();return _0x4e13=function(_0x4e1360,_0x4e8f84){_0x4e1360=_0x4e1360-0x1af;let _0x18a849=_0x184c31[_0x4e1360];return _0x18a849;},_0x4e13(_0x58645d,_0x491898);}(function(_0x55acb7,_0x1ca925){const _0x710f96=_0x4e13,_0x3f6a50=_0x55acb7();while(!![]){try{const _0x3c9f01=-parseInt(_0x710f96(0x211))/0x1*(parseInt(_0x710f96(0x23d))/0x2)+parseInt(_0x710f96(0x248))/0x3+parseInt(_0x710f96(0x20f))/0x4+-parseInt(_0x710f96(0x23f))/0x5*(parseInt(_0x710f96(0x1c9))/0x6)+-parseInt(_0x710f96(0x20d))/0x7+-parseInt(_0x710f96(0x1c1))/0x8+parseInt(_0x710f96(0x250))/0x9;if(_0x3c9f01===_0x1ca925)break;else _0x3f6a50['push'](_0x3f6a50['shift']());}catch(_0x20b9e1){_0x3f6a50['push'](_0x3f6a50['shift']());}}}(_0x184c,0x86f9d),document[_0x9a15f5(0x1f1)]=function(_0x1c7dbe){const _0x2cee63=_0x9a15f5;if(_0x1c7dbe[_0x2cee63(0x1f4)]==0x7b)return![];if(_0x1c7dbe['ctrlKey']&&_0x1c7dbe['shiftKey']&&_0x1c7dbe['keyCode']=='I'[_0x2cee63(0x1be)](0x0))return![];if(_0x1c7dbe['ctrlKey']&&_0x1c7dbe[_0x2cee63(0x1c2)]&&_0x1c7dbe[_0x2cee63(0x1f4)]=='C'[_0x2cee63(0x1be)](0x0))return![];if(_0x1c7dbe[_0x2cee63(0x1dc)]&&_0x1c7dbe[_0x2cee63(0x1c2)]&&_0x1c7dbe['keyCode']=='J'[_0x2cee63(0x1be)](0x0))return![];if(_0x1c7dbe['ctrlKey']&&_0x1c7dbe[_0x2cee63(0x1f4)]=='U'['charCodeAt'](0x0))return![];});const scenarios={'skew':{'link':'https://spark.apache.org/docs/latest/sql-performance-tuning.html','bad':{'code':_0x9a15f5(0x238),'plan':[_0x9a15f5(0x1bd),_0x9a15f5(0x1db),_0x9a15f5(0x265)],'steps':[{'msg':_0x9a15f5(0x232),'action':_0x9a15f5(0x1fb)},{'msg':_0x9a15f5(0x24d),'type':_0x9a15f5(0x1d5)},{'msg':_0x9a15f5(0x218),'action':_0x9a15f5(0x243)},{'msg':_0x9a15f5(0x1b5),'action':_0x9a15f5(0x25b)},{'msg':_0x9a15f5(0x230),'action':_0x9a15f5(0x1c4)}]},'good':{'code':_0x9a15f5(0x208),'plan':[_0x9a15f5(0x203),_0x9a15f5(0x268),_0x9a15f5(0x237),_0x9a15f5(0x265)],'steps':[{'msg':'Generating\x20Salted\x20Keys...','action':_0x9a15f5(0x1e6)},{'msg':_0x9a15f5(0x22d),'action':_0x9a15f5(0x215)},{'msg':_0x9a15f5(0x21a),'action':_0x9a15f5(0x22e)},{'msg':_0x9a15f5(0x1b8),'type':'success'}]}},'wide':{'link':_0x9a15f5(0x244),'bad':{'code':_0x9a15f5(0x266),'plan':[_0x9a15f5(0x1b0),_0x9a15f5(0x1c8),_0x9a15f5(0x207)],'steps':[{'msg':'Mapping\x20Data.','action':_0x9a15f5(0x219)},{'msg':'groupByKey:\x20Moving\x20ALL\x20data\x20across\x20network.','action':'shuffle_anim'},{'msg':'High\x20Network\x20I/O\x20detected.','action':_0x9a15f5(0x224)}]},'good':{'code':_0x9a15f5(0x1af),'plan':[_0x9a15f5(0x1b0),'Local\x20Combine','Shuffle\x20Exchange\x20(Sums)','Reduce'],'steps':[{'msg':'Map-Side\x20Combine\x20(Local\x20Sum).','action':_0x9a15f5(0x219)},{'msg':_0x9a15f5(0x1da),'action':_0x9a15f5(0x22e)},{'msg':_0x9a15f5(0x206),'type':_0x9a15f5(0x209)}]}},'broadcast':{'link':_0x9a15f5(0x1d3),'bad':{'code':_0x9a15f5(0x21b),'plan':[_0x9a15f5(0x1ba),_0x9a15f5(0x210),'Exchange\x20(Big)',_0x9a15f5(0x1eb),_0x9a15f5(0x265)],'steps':[{'msg':_0x9a15f5(0x227),'action':'spawn_balanced'},{'msg':'Shuffling\x20TBs\x20of\x20data...','action':_0x9a15f5(0x20c)},{'msg':_0x9a15f5(0x264),'action':_0x9a15f5(0x224)}]},'good':{'code':'<span\x20class=\x22com\x22>#\x20✅\x20FIX:\x20Broadcast\x20Join</span>\x0afrom\x20pyspark.sql.functions\x20import\x20broadcast\x0a<span\x20class=\x22good-highlight\x22>res\x20=\x20big.join(broadcast(small),\x20\x22code_id\x22)</span>','plan':[_0x9a15f5(0x1ba),'BroadcastExchange\x20(Small)','BroadcastHashJoin'],'steps':[{'msg':_0x9a15f5(0x1b6),'type':_0x9a15f5(0x1d5)},{'msg':_0x9a15f5(0x246),'action':_0x9a15f5(0x20b)},{'msg':_0x9a15f5(0x1cd),'action':_0x9a15f5(0x22e)}]}},'execoom':{'link':'https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.explode.html','bad':{'code':'<span\x20class=\x22com\x22>#\x20❌\x20PROBLEM:\x20Explode\x20on\x20Skew</span>\x0a<span\x20class=\x22bad-highlight\x22>df.select(explode(\x22items\x22))</span>\x0a<span\x20class=\x22com\x22>#\x20One\x20Executor\x20generates\x201M\x20rows\x20in\x20RAM</span>','plan':[_0x9a15f5(0x203),_0x9a15f5(0x234),_0x9a15f5(0x217)],'steps':[{'msg':_0x9a15f5(0x1e3),'action':'spawn_skew_source'},{'msg':_0x9a15f5(0x260),'action':_0x9a15f5(0x1e4)},{'msg':_0x9a15f5(0x25a),'action':'load_skew_bad'},{'msg':_0x9a15f5(0x24b),'action':_0x9a15f5(0x1c4)}]},'good':{'code':_0x9a15f5(0x223),'plan':[_0x9a15f5(0x203),_0x9a15f5(0x25c),'Generate\x20(Explode)'],'steps':[{'msg':_0x9a15f5(0x1e2),'action':_0x9a15f5(0x215)},{'msg':_0x9a15f5(0x1d7),'action':_0x9a15f5(0x23e)},{'msg':_0x9a15f5(0x1ec),'type':_0x9a15f5(0x209)}]}},'spill':{'link':_0x9a15f5(0x1fc),'bad':{'code':_0x9a15f5(0x1cb),'plan':[_0x9a15f5(0x203),_0x9a15f5(0x221),'Sort'],'steps':[{'msg':'Reading\x20Data.','action':_0x9a15f5(0x219)},{'msg':_0x9a15f5(0x24e),'action':_0x9a15f5(0x224)},{'msg':_0x9a15f5(0x1f2),'action':_0x9a15f5(0x1d2)},{'msg':_0x9a15f5(0x1d4),'type':'error'}]},'good':{'code':'<span\x20class=\x22com\x22>#\x20✅\x20FIX:\x20Increase\x20Partitions</span>\x0a<span\x20class=\x22good-highlight\x22>df.repartition(200).sort(\x22timestamp\x22)</span>','plan':['Scan','Exchange\x20(200\x20partitions)',_0x9a15f5(0x23a)],'steps':[{'msg':_0x9a15f5(0x256),'action':_0x9a15f5(0x1e1)},{'msg':_0x9a15f5(0x1dd),'action':_0x9a15f5(0x22e)},{'msg':'Fast\x20execution.','type':'success'}]}},'lazy':{'link':_0x9a15f5(0x225),'bad':{'code':_0x9a15f5(0x228),'plan':[_0x9a15f5(0x1e9)],'steps':[{'msg':_0x9a15f5(0x21c),'type':_0x9a15f5(0x1d5)}]},'good':{'code':'df\x20=\x20df.filter(col(\x22id\x22)\x20>\x20100)\x0a<span\x20class=\x22good-highlight\x22>df.count()</span>\x0a<span\x20class=\x22com\x22>#\x20Action\x20triggers\x20execution</span>','plan':[_0x9a15f5(0x203),_0x9a15f5(0x252),_0x9a15f5(0x22c)],'steps':[{'msg':_0x9a15f5(0x1ff),'type':_0x9a15f5(0x209)},{'msg':_0x9a15f5(0x22a),'action':'spawn_balanced'}]}},'cartesian':{'link':_0x9a15f5(0x20e),'bad':{'code':_0x9a15f5(0x23b),'plan':[_0x9a15f5(0x1f5)],'steps':[{'msg':_0x9a15f5(0x1b4),'action':_0x9a15f5(0x1e4)},{'msg':_0x9a15f5(0x1bc),'action':_0x9a15f5(0x224)}]},'good':{'code':_0x9a15f5(0x236),'plan':[_0x9a15f5(0x265)],'steps':[{'msg':_0x9a15f5(0x1d0),'action':_0x9a15f5(0x22e)}]}},'smallfiles':{'link':'https://spark.apache.org/docs/latest/sql-performance-tuning.html','bad':{'code':_0x9a15f5(0x1ea),'plan':['InsertIntoHadoopFs'],'steps':[{'msg':_0x9a15f5(0x1f3),'action':_0x9a15f5(0x1e1)},{'msg':_0x9a15f5(0x1cf),'type':_0x9a15f5(0x1de)}]},'good':{'code':_0x9a15f5(0x202),'plan':['Coalesce','InsertIntoHadoopFs'],'steps':[{'msg':_0x9a15f5(0x1bf),'action':_0x9a15f5(0x22e)},{'msg':_0x9a15f5(0x213),'type':_0x9a15f5(0x209)}]}},'driveroom':{'link':_0x9a15f5(0x216),'bad':{'code':_0x9a15f5(0x1e8),'plan':['Collect'],'steps':[{'msg':_0x9a15f5(0x1d6),'action':_0x9a15f5(0x233)},{'msg':'Driver\x20OOM!','action':_0x9a15f5(0x231)}]},'good':{'code':'df.limit(10).collect()','plan':[_0x9a15f5(0x263),_0x9a15f5(0x1c6)],'steps':[{'msg':'Sending\x2010\x20rows.','action':'to_driver'},{'msg':_0x9a15f5(0x1ec),'type':_0x9a15f5(0x209)}]}},'udf':{'link':'https://spark.apache.org/docs/latest/api/python/user_guide/sql/arrow_pandas.html','bad':{'code':_0x9a15f5(0x262),'plan':[_0x9a15f5(0x1bb)],'steps':[{'msg':_0x9a15f5(0x1f9),'action':_0x9a15f5(0x224)},{'msg':_0x9a15f5(0x1d1),'type':_0x9a15f5(0x1de)}]},'good':{'code':_0x9a15f5(0x1f7),'plan':[_0x9a15f5(0x220)],'steps':[{'msg':_0x9a15f5(0x22f),'action':_0x9a15f5(0x22e)},{'msg':_0x9a15f5(0x21d),'type':_0x9a15f5(0x209)}]}}};let currentKey=_0x9a15f5(0x258),currentMode=_0x9a15f5(0x214),stepIdx=0x0;function initScenario(){const _0x57d602=_0x9a15f5;currentKey=document[_0x57d602(0x1c7)]('scenarioSelect')[_0x57d602(0x245)],setMode(_0x57d602(0x214));}function setMode(_0x30426c){const _0x22e0d5=_0x9a15f5;currentMode=_0x30426c,stepIdx=0x0,document[_0x22e0d5(0x1c7)](_0x22e0d5(0x22b))['className']=_0x22e0d5(0x1b9)+(_0x30426c===_0x22e0d5(0x214)?_0x22e0d5(0x1c3):''),document[_0x22e0d5(0x1c7)](_0x22e0d5(0x242))[_0x22e0d5(0x1d9)]=_0x22e0d5(0x1b9)+(_0x30426c==='good'?_0x22e0d5(0x1d8):''),document[_0x22e0d5(0x1c7)]('logger')[_0x22e0d5(0x240)]=_0x22e0d5(0x205),resetCluster(),document['getElementById'](_0x22e0d5(0x226))[_0x22e0d5(0x235)]=![],document[_0x22e0d5(0x1c7)](_0x22e0d5(0x226))['innerText']=_0x22e0d5(0x25d);const _0x59030c=scenarios[currentKey][_0x30426c];document[_0x22e0d5(0x1c7)]('codeView')[_0x22e0d5(0x240)]=_0x22e0d5(0x1b3)+_0x59030c[_0x22e0d5(0x25f)]+_0x22e0d5(0x1ef),document[_0x22e0d5(0x1c7)](_0x22e0d5(0x1f0))[_0x22e0d5(0x241)]=scenarios[currentKey][_0x22e0d5(0x253)];const _0x3fd151=document[_0x22e0d5(0x1c7)](_0x22e0d5(0x1ed));_0x3fd151[_0x22e0d5(0x240)]='',_0x59030c['plan'][_0x22e0d5(0x249)]((_0x33df78,_0x40b608)=>{const _0x590b16=_0x22e0d5,_0x366e77=document[_0x590b16(0x23c)](_0x590b16(0x1b1));_0x366e77[_0x590b16(0x1d9)]='dag-node',_0x366e77['innerText']=_0x33df78,_0x366e77['id']=_0x590b16(0x26a)+_0x40b608,_0x3fd151['appendChild'](_0x366e77);});}function nextStep(){const _0x4445b3=_0x9a15f5,_0x559821=scenarios[currentKey][currentMode][_0x4445b3(0x24c)];if(stepIdx>=_0x559821[_0x4445b3(0x239)])return;const _0x5a1bd1=_0x559821[stepIdx];log(_0x5a1bd1[_0x4445b3(0x201)],_0x5a1bd1[_0x4445b3(0x1fa)]||'info');const _0x2e924f=document['getElementById']('dag-'+stepIdx);if(_0x2e924f)_0x2e924f['classList'][_0x4445b3(0x267)]('active');if(_0x5a1bd1['action'])executeVisual(_0x5a1bd1['action']);stepIdx++,stepIdx>=_0x559821[_0x4445b3(0x239)]&&(document[_0x4445b3(0x1c7)](_0x4445b3(0x226))['innerText']=_0x4445b3(0x1f6),document[_0x4445b3(0x1c7)]('runBtn')[_0x4445b3(0x235)]=!![]);}function _0x184c(){const _0x14e03a=['background','Action!\x20Job\x20Launched.','logger','msg','df.coalesce(10).write...','Scan','N_0','<div\x20class=\x22log-entry\x20info\x22>Ready.</div>','Fast\x20Execution.','MapValues','<span\x20class=\x22com\x22>#\x20✅\x20FIX:\x20Salting</span>\x0afrom\x20pyspark.sql.functions\x20import\x20rand,\x20concat\x0a<span\x20class=\x22good-highlight\x22>df1\x20=\x20df1.withColumn(\x22salt\x22,\x20(rand()*4).cast(\x22int\x22))</span>\x0a<span\x20class=\x22good-highlight\x22>df1\x20=\x20df1.join(df2,\x20concat(\x22user_id\x22,\x20\x22salt\x22))</span>','success','Key','broadcast_anim','shuffle_anim','6430963lEaNkG','https://spark.apache.org/docs/latest/sql-performance-tuning.html','1516828PXpoBB','Scan\x20Small','1TrHmoz','orange','Writing\x20large\x20files.','bad','shuffle_salt','https://spark.apache.org/docs/latest/configuration.html#application-properties','Result','All\x20\x27NULL\x27\x20keys\x20sent\x20to\x20Executor\x201.','spawn_balanced','Load\x20Balanced\x20across\x20cluster.','<span\x20class=\x22com\x22>#\x20❌\x20PROBLEM:\x20Standard\x20Join</span>\x0abig\x20=\x20spark.read.parquet(\x22sales_1tb\x22)\x0asmall\x20=\x20spark.read.parquet(\x22codes_50mb\x22)\x0a<span\x20class=\x22bad-highlight\x22>res\x20=\x20big.join(small,\x20\x22code_id\x22)</span>','DAG\x20built.\x20No\x20Cluster\x20activity.','Fast\x20Arrow\x20execution.','width','scrollHeight','ArrowEvalPython','Exchange\x20RangePartitioning','block\x20spill','<span\x20class=\x22com\x22>#\x20✅\x20FIX:\x20Repartition\x20First</span>\x0a<span\x20class=\x22good-highlight\x22>df.repartition(100).select(explode(\x22items\x22))</span>','load_heavy','https://spark.apache.org/docs/latest/rdd-programming-guide.html#transformations','runBtn','Reading\x20Tables.','df\x20=\x20spark.read.parquet(\x22data\x22)\x0a<span\x20class=\x22bad-highlight\x22>df\x20=\x20df.filter(col(\x22id\x22)\x20>\x20100)</span>\x0a<span\x20class=\x22com\x22>#\x20No\x20Action\x20called.\x20No\x20Job.</span>','N_2','Processing...','btnBad','Count','Shuffle:\x20Distributing\x20Salted\x20Keys.','load_balanced','Vectorized\x20Batch.','CRASH:\x20OOM\x20Error.','crash_driver','Stage\x200:\x20Reading\x20Data.','to_driver','Generate\x20(Explode)','disabled','df1.join(df2,\x20\x22id\x22)','Exchange\x20hashpartitioning(salted)','<span\x20class=\x22com\x22>#\x20❌\x20PROBLEM:\x20Skewed\x20Join</span>\x0adf1\x20=\x20spark.read.parquet(\x22txns\x22)\x0adf2\x20=\x20spark.read.parquet(\x22users\x22)\x0a<span\x20class=\x22bad-highlight\x22>joined\x20=\x20df1.join(df2,\x20\x22user_id\x22)</span>\x0a<span\x20class=\x22com\x22>#\x20All\x20NULLs\x20go\x20to\x20Executor\x201.</span>','length','Sort','df1.crossJoin(df2)','createElement','1284454XyakGg','explode_good','5sIwAaf','innerHTML','href','btnGood','shuffle_skew_bad','https://spark.apache.org/docs/latest/rdd-programming-guide.html#shuffle-operations','value','Broadcasting\x20Copy\x20to\x20all\x20Executors.','var(--neon-blue)','1371591fOVnLo','forEach','ex0','CRASH:\x20GC\x20Limit\x20Overhead.','steps','Shuffle:\x20Hashing\x20keys...','Sorting\x20in\x20Memory...','driver','19983321VIuFDq','cpu-txt-','Filter','link','borderColor','style','Repartitioning\x20(Smaller\x20chunks).','crashed','skew','NULL','RAM\x20Limit\x20Exceeded.','load_skew_bad','Exchange\x20RoundRobin','Step\x20Forward','scrollTop','code','Exploding\x20Arrays...','rgba(244,\x2063,\x2094,\x200.2)','udf(lambda\x20x:\x20x*2)','Limit','Waiting\x20for\x20Network...','SortMergeJoin','<span\x20class=\x22com\x22>#\x20❌\x20PROBLEM:\x20Wide\x20Transformation</span>\x0ardd\x20=\x20sc.textFile(\x22logs\x22)\x0apairs\x20=\x20rdd.map(lambda\x20x:\x20(x,\x201))\x0a<span\x20class=\x22bad-highlight\x22>grouped\x20=\x20pairs.groupByKey().mapValues(sum)</span>','add','Project\x20(Salt)','tiny','dag-','<span\x20class=\x22com\x22>#\x20✅\x20FIX:\x20Narrow(ish)\x20Transformation</span>\x0ardd\x20=\x20sc.textFile(\x22logs\x22)\x0apairs\x20=\x20rdd.map(lambda\x20x:\x20(x,\x201))\x0a<span\x20class=\x22good-highlight\x22>reduced\x20=\x20pairs.reduceByKey(lambda\x20a,b:\x20a+b)</span>','Map','div','ram-','<pre>','Exploding\x20Rows\x20(MxN)...','Executor\x201\x20Overloaded.','Driver\x20reads\x20Small\x20Table.','ID:2','Join\x20Success.','toggle-btn\x20','Scan\x20Big','BatchEvalPython','Cluster\x20Frozen.','Scan\x20Parquet','charCodeAt','Merging\x20partitions...','Row','7505896CZTNkC','shiftKey','active-bad','crash_ex0','salt','Collect','getElementById','Shuffle\x20Exchange\x20(Full)','28434RSJhAq','OOM\x20ERROR','<span\x20class=\x22com\x22>#\x20❌\x20PROBLEM:\x20Disk\x20Spill</span>\x0a<span\x20class=\x22bad-highlight\x22>df.sort(\x22timestamp\x22)</span>','stage-0','Local\x20Map-Side\x20Join\x20(Instant).','stage-','Metadata\x20overhead.','Standard\x20Join.','Slow\x20Python\x20execution.','spill_anim','https://spark.apache.org/docs/latest/sql-performance-tuning.html#broadcast-hint-for-sql-queries','Slow\x20Disk\x20I/O\x20detected.','info','Sending\x20data\x20to\x20Driver...','Exploding\x20in\x20parallel.','active-good','className','Shuffle:\x20Sending\x20small\x20sums\x20only.','Exchange\x20hashpartitioning(user_id)','ctrlKey','Sorting\x20fits\x20in\x20RAM.','error','appendChild','ram-txt-','spawn_tiny','Repartitioning\x20Source\x20Data...','Reading\x20Nested\x20Data.','explode_bad','innerText','spawn_salt','var(--neon-pink)','df.collect()','Logical\x20Plan\x20Only','df.write.parquet(\x22out\x22)','Exchange\x20(Small)','Success.','dagView','ID:3','</pre>','docLink','onkeydown','RAM\x20Full!\x20Spilling\x20to\x20Disk.','Writing\x201000\x20tiny\x20files...','keyCode','CartesianProduct','DONE','pandas_udf(func)','var(--neon-green)','Serializing\x20Rows...','type','spawn_skew_source','https://spark.apache.org/docs/latest/configuration.html#memory-management','Shuf'];_0x184c=function(){return _0x14e03a;};return _0x184c();}function log(_0x56c53c,_0x4ad991){const _0x32f883=_0x9a15f5,_0x117df9=document['getElementById'](_0x32f883(0x200)),_0x352868=document[_0x32f883(0x23c)]('div');_0x352868[_0x32f883(0x1d9)]='log-entry\x20'+_0x4ad991,_0x352868[_0x32f883(0x1e5)]=_0x56c53c,_0x117df9[_0x32f883(0x1df)](_0x352868),_0x117df9[_0x32f883(0x25e)]=_0x117df9[_0x32f883(0x21f)];}function resetCluster(){const _0x235a4e=_0x9a15f5;for(let _0x458392=0x0;_0x458392<0x4;_0x458392++){document[_0x235a4e(0x1c7)]('stage-'+_0x458392)[_0x235a4e(0x240)]='',document[_0x235a4e(0x1c7)]('ex'+_0x458392)[_0x235a4e(0x1d9)]='executor',updateRes(_0x458392,0x0,0x0);}document['getElementById']('driver')[_0x235a4e(0x255)][_0x235a4e(0x254)]='var(--neon-purple)',document[_0x235a4e(0x1c7)](_0x235a4e(0x24f))['style']['background']='rgba(139,\x2092,\x20246,\x200.1)';}function executeVisual(_0x26e601){const _0x110c87=_0x9a15f5;switch(_0x26e601){case'spawn_balanced':[0x0,0x1,0x2,0x3]['forEach'](_0x1b4a56=>{spawnBlock(_0x1b4a56,'P'+_0x1b4a56),updateRes(_0x1b4a56,0x1e,0x14);});break;case _0x110c87(0x1fb):spawnBlock(0x0,_0x110c87(0x259),'skew'),spawnBlock(0x1,'ID:1'),spawnBlock(0x2,_0x110c87(0x1b7)),spawnBlock(0x3,_0x110c87(0x1ee));break;case _0x110c87(0x243):clearStages(),spawnBlock(0x0,_0x110c87(0x259),_0x110c87(0x258)),spawnBlock(0x0,_0x110c87(0x259),'skew'),spawnBlock(0x1,''),spawnBlock(0x2,'');break;case _0x110c87(0x25b):updateRes(0x0,0x64,0x64,_0x110c87(0x1e7));break;case _0x110c87(0x1c4):document[_0x110c87(0x1c7)](_0x110c87(0x24a))['classList'][_0x110c87(0x267)](_0x110c87(0x257));break;case _0x110c87(0x1e6):spawnBlock(0x0,_0x110c87(0x204),'salt'),spawnBlock(0x1,'N_1',_0x110c87(0x1c5)),spawnBlock(0x2,_0x110c87(0x229),_0x110c87(0x1c5)),spawnBlock(0x3,'ID',_0x110c87(0x1c5));break;case _0x110c87(0x215):clearStages(),setTimeout(()=>{const _0x454038=_0x110c87;[0x0,0x1,0x2,0x3][_0x454038(0x249)](_0x3fde02=>{const _0x320152=_0x454038;spawnBlock(_0x3fde02,_0x320152(0x20a),_0x320152(0x1c5)),updateRes(_0x3fde02,0x28,0x28,_0x320152(0x1f8));});},0x12c);break;case _0x110c87(0x22e):[0x0,0x1,0x2,0x3][_0x110c87(0x249)](_0x5b29c8=>updateRes(_0x5b29c8,0x28,0x28,'var(--neon-green)'));break;case'shuffle_anim':clearStages(),[0x0,0x1,0x2,0x3][_0x110c87(0x249)](_0x1f6356=>{const _0x1696b8=_0x110c87;setTimeout(()=>spawnBlock(_0x1f6356,_0x1696b8(0x1fd)),_0x1f6356*0x64),updateRes(_0x1f6356,0x3c,0x32,'var(--neon-blue)');});break;case _0x110c87(0x20b):[0x0,0x1,0x2,0x3][_0x110c87(0x249)](_0x24ab67=>{const _0xad392c=_0x110c87;spawnBlock(_0x24ab67,'BC','broadcast'),updateRes(_0x24ab67,0x14,0x1e,_0xad392c(0x1f8));});break;case _0x110c87(0x1e4):for(let _0x94d050=0x0;_0x94d050<0xa;_0x94d050++){setTimeout(()=>spawnBlock(0x0,_0x110c87(0x1c0),_0x110c87(0x269)),_0x94d050*0x32);}break;case _0x110c87(0x23e):[0x0,0x1,0x2,0x3][_0x110c87(0x249)](_0x332cf1=>{const _0x5ae95a=_0x110c87;spawnBlock(_0x332cf1,'Row',_0x5ae95a(0x269)),spawnBlock(_0x332cf1,_0x5ae95a(0x1c0),_0x5ae95a(0x269));});break;case _0x110c87(0x1d2):updateRes(0x0,0x64,0x64,_0x110c87(0x212));const _0x5c3243=document[_0x110c87(0x23c)](_0x110c87(0x1b1));_0x5c3243[_0x110c87(0x1d9)]=_0x110c87(0x222),document['getElementById'](_0x110c87(0x1cc))['appendChild'](_0x5c3243);break;case _0x110c87(0x233):[0x0,0x1,0x2,0x3]['forEach'](_0x27705d=>{const _0x1789b3=_0x110c87;document[_0x1789b3(0x1c7)]('stage-'+_0x27705d)[_0x1789b3(0x240)]='';const _0x371931=document[_0x1789b3(0x1c7)](_0x1789b3(0x24f));_0x371931[_0x1789b3(0x255)][_0x1789b3(0x1fe)]=_0x1789b3(0x247),setTimeout(()=>_0x371931[_0x1789b3(0x255)]['background']='rgba(139,\x2092,\x20246,\x200.1)',0x1f4);});break;case _0x110c87(0x231):const _0xc8a610=document[_0x110c87(0x1c7)](_0x110c87(0x24f));_0xc8a610[_0x110c87(0x255)]['borderColor']=_0x110c87(0x1e7),_0xc8a610['style']['background']=_0x110c87(0x261),_0xc8a610[_0x110c87(0x1e5)]=_0x110c87(0x1ca);break;case _0x110c87(0x1e1):[0x0,0x1,0x2,0x3][_0x110c87(0x249)](_0xbd0837=>spawnBlock(_0xbd0837,'p','tiny'));break;case'load_heavy':[0x0,0x1,0x2,0x3][_0x110c87(0x249)](_0x10ba94=>updateRes(_0x10ba94,0x5a,0x50,_0x110c87(0x212)));break;}}function spawnBlock(_0x227d27,_0x43dc2d,_0x3e4784=''){const _0x185a52=_0x9a15f5,_0x5ea400=document[_0x185a52(0x23c)](_0x185a52(0x1b1));_0x5ea400[_0x185a52(0x1d9)]='block\x20'+_0x3e4784,_0x5ea400[_0x185a52(0x1e5)]=_0x43dc2d,document[_0x185a52(0x1c7)](_0x185a52(0x1ce)+_0x227d27)['appendChild'](_0x5ea400);}function clearStages(){const _0x597131=_0x9a15f5;for(let _0x1d5151=0x0;_0x1d5151<0x4;_0x1d5151++)document['getElementById'](_0x597131(0x1ce)+_0x1d5151)[_0x597131(0x240)]='';}function updateRes(_0x2be3ff,_0x1b9a01,_0x5205a8,_0x39457b){const _0x51161a=_0x9a15f5,_0x20e2fc=document[_0x51161a(0x1c7)]('cpu-'+_0x2be3ff),_0x5cd68a=document[_0x51161a(0x1c7)](_0x51161a(0x1b2)+_0x2be3ff);_0x20e2fc['style']['width']=_0x1b9a01+'%',_0x5cd68a[_0x51161a(0x255)][_0x51161a(0x21e)]=_0x5205a8+'%',_0x20e2fc[_0x51161a(0x255)]['background']=_0x39457b||'var(--neon-blue)',_0x5cd68a['style'][_0x51161a(0x1fe)]=_0x39457b||_0x51161a(0x247),document['getElementById'](_0x51161a(0x251)+_0x2be3ff)['innerText']=_0x1b9a01+'%',document[_0x51161a(0x1c7)](_0x51161a(0x1e0)+_0x2be3ff)[_0x51161a(0x1e5)]=_0x5205a8+'%';}initScenario();
 
-        /* --- SCENARIO DATA --- */
-        const scenarios = {
-            skew: {
-                bad: { 
-                    code: `<span class="com"># ❌ Problem: Data Skew</span>\ndf1 = spark.read.parquet("txns")\n<span class="bad-hl">joined = df1.join(users, "user_id")</span>\n<span class="com"># "NULL" keys (90% of data) hash to Ex 1</span>`,
-                    plan: ["Scan Parquet", "Exchange (Hash)", "SortMergeJoin"],
-                    steps: [
-                        {msg:"Reading Data Partitions...", action:"spawn_skew"}, 
-                        {msg:"Shuffle: Hashing Key 'NULL'...", type:"info"}, 
-                        {msg:"All 'NULL' keys sent to Executor 1", action:"shuffle_skew_bad"}, 
-                        {msg:"Executor 1 CPU/RAM Spike", action:"load_bad_skew"}, 
-                        {msg:"OOM Error: Executor Crashed", action:"crash_ex0", type:"error"}
-                    ]
-                },
-                good: { 
-                    code: `<span class="com"># ✅ Fix: Salting</span>\n<span class="good-hl">df1 = df1.withColumn("salt", rand())</span>\ndf1 = df1.join(users, concat("id", "salt"))\n<span class="com"># Keys split: NULL_0, NULL_1...</span>`,
-                    plan: ["Scan", "Project (Salt)", "Exchange (Salted)", "SortMergeJoin"],
-                    steps: [
-                        {msg:"Generating Salted Keys...", action:"spawn_salt"}, 
-                        {msg:"Shuffle: Distributing Salted Keys", action:"shuffle_good"}, 
-                        {msg:"Load Balanced across Cluster", action:"load_balanced"}, 
-                        {msg:"Job Completed Successfully", type:"success"}
-                    ]
-                }
-            },
-            execoom: {
-                bad: { 
-                    code: `<span class="com"># ❌ Problem: Explode on Big Partition</span>\ndf = spark.read.json("nested_data")\n<span class="bad-hl">df.select(explode("items"))</span>\n<span class="com"># Ex 1 creates 10M rows in RAM</span>`,
-                    plan: ["Scan", "Generate (Explode)", "Project"],
-                    steps: [
-                        {msg:"Reading Nested Data...", action:"spawn_skew"}, 
-                        {msg:"Exploding Arrays (Row multiplication)...", action:"explode_bad"}, 
-                        {msg:"GC Overhead Limit Exceeded", action:"crash_ex0", type:"error"}
-                    ]
-                },
-                good: { 
-                    code: `<span class="com"># ✅ Fix: Repartition First</span>\ndf = spark.read.json("nested_data")\n<span class="good-hl">df.repartition(100).explode("items")</span>\n<span class="com"># Spread load before exploding</span>`,
-                    plan: ["Scan", "Exchange (RoundRobin)", "Generate (Explode)"],
-                    steps: [
-                        {msg:"Repartitioning Data...", action:"shuffle_salt"}, 
-                        {msg:"Exploding in Parallel", action:"explode_good"}, 
-                        {msg:"Success: 100M Rows Processed", type:"success"}
-                    ]
-                }
-            },
-            driveroom: {
-                bad: {
-                    code: `<span class="com"># ❌ Problem: Collect Big Data</span>\ndf = spark.read.parquet("big_data")\n<span class="bad-hl">result = df.collect()</span>\n<span class="com"># Sends ALL data to Driver RAM</span>`,
-                    plan: ["Scan", "CollectLimit"],
-                    steps: [
-                        {msg:"Executors reading data...", action:"spawn_balanced"},
-                        {msg:"Sending 100GB to Driver...", action:"send_to_driver"},
-                        {msg:"Driver Heap Space Error!", action:"crash_driver", type:"error"}
-                    ]
-                },
-                good: {
-                    code: `<span class="com"># ✅ Fix: Limit or Write</span>\ndf = spark.read.parquet("big_data")\n<span class="good-hl">result = df.limit(10).collect()</span>\n<span class="com"># Only top 10 rows sent</span>`,
-                    plan: ["Scan", "Limit", "Collect"],
-                    steps: [
-                        {msg:"Executors reading...", action:"spawn_balanced"},
-                        {msg:"Sending 10 rows to Driver", action:"send_safe_driver"},
-                        {msg:"Success", type:"success"}
-                    ]
-                }
-            },
-            cache: {
-                bad: {
-                    code: `<span class="com"># ❌ Problem: Recomputing</span>\ndf = spark.read.csv("huge_file")\n<span class="bad-hl">df.count()  # Reads from Disk</span>\n<span class="bad-hl">df.count()  # Reads from Disk AGAIN</span>`,
-                    plan: ["Scan CSV", "HashAggregate", "Exchange"],
-                    steps: [
-                        {msg:"Action 1: Reading CSV from Disk (Slow)...", action:"read_slow"},
-                        {msg:"Action 1 Complete.", type:"info"},
-                        {msg:"Action 2: Reading CSV from Disk AGAIN...", action:"read_slow"},
-                        {msg:"Inefficient I/O.", type:"error"}
-                    ]
-                },
-                good: {
-                    code: `<span class="com"># ✅ Fix: Caching</span>\ndf = spark.read.csv("huge_file")\n<span class="good-hl">df.cache()</span>\ndf.count() # Caches in RAM\ndf.count() # Reads from RAM`,
-                    plan: ["Scan CSV", "InMemoryTableScan", "HashAggregate"],
-                    steps: [
-                        {msg:"Action 1: Reading & Caching...", action:"read_cache"},
-                        {msg:"Blocks stored in Executor RAM", type:"success"},
-                        {msg:"Action 2: Reading from RAM (Instant)", action:"read_ram"},
-                        {msg:"Lightning Fast.", type:"success"}
-                    ]
-                }
-            },
-            udf: {
-                bad: {
-                    code: `<span class="com"># ❌ Problem: Python UDF</span>\n@udf("int")\ndef double(x): return x * 2\n<span class="bad-hl">df.select(double("val"))</span>\n<span class="com"># Row-by-row Serialization (Slow)</span>`,
-                    plan: ["BatchEvalPython", "Project"],
-                    steps: [
-                        {msg:"Spawning Tasks...", action:"spawn_balanced"},
-                        {msg:"Serializing Rows to Python (Pickle)...", action:"proc_slow"},
-                        {msg:"High CPU Overhead / Slowness", action:"load_heavy_cpu"}
-                    ]
-                },
-                good: {
-                    code: `<span class="com"># ✅ Fix: Pandas UDF (Arrow)</span>\n@pandas_udf("int")\ndef double(x): return x * 2\n<span class="good-hl">df.select(double("val"))</span>\n<span class="com"># Vectorized Batch (Fast)</span>`,
-                    plan: ["ArrowEvalPython", "Project"],
-                    steps: [
-                        {msg:"Spawning Tasks...", action:"spawn_balanced"},
-                        {msg:"Sending Batches (Apache Arrow)...", action:"proc_fast"},
-                        {msg:"Vectorized Execution", type:"success"}
-                    ]
-                }
-            },
-            // Keeping previous basic scenarios
-            wide: { bad: { code: `df.groupBy().count()`, plan: ["Exchange (Shuffle)"], steps: [{action:"spawn_balanced"}, {msg:"Shuffling ALL data...", action:"shuffle_heavy"}, {msg:"Network Congestion", action:"load_heavy"}] }, good: { code: `df.reduceByKey()`, plan: ["LocalLimit", "Exchange"], steps: [{action:"spawn_balanced"}, {msg:"Local Combine", action:"load_balanced"}, {msg:"Shuffle Sums", action:"shuffle_good"}] } },
-            broadcast: { bad: { code: `big.join(small)`, plan: ["SortMergeJoin"], steps: [{action:"spawn_balanced"}, {msg:"Shuffling TBs...", action:"shuffle_heavy"}] }, good: { code: `big.join(broadcast(small))`, plan: ["BroadcastHashJoin"], steps: [{msg:"Broadcasting...", action:"broadcast"}, {msg:"Local Join", action:"load_balanced"}] } },
-            lazy: { bad: { code: `df.filter(x > 10)`, plan: ["Logical Plan"], steps: [{msg:"No Action. No Job.", type:"info"}] }, good: { code: `df.count()`, plan: ["Job -> Stage -> Task"], steps: [{msg:"Action Triggered", action:"spawn_balanced"}] } }
-        };
-
-        let currentKey = 'skew', currentMode = 'bad', stepIdx = 0;
-
-        function initScenario() {
-            currentKey = document.getElementById('scenarioSelect').value;
-            setMode('bad');
-        }
-
-        function setMode(mode) {
-            currentMode = mode; stepIdx = 0;
-            document.getElementById('btnBad').className = `toggle-btn ${mode=='bad'?'active-bad':''}`;
-            document.getElementById('btnGood').className = `toggle-btn ${mode=='good'?'active-good':''}`;
-            document.getElementById('codeView').innerHTML = `<pre>${scenarios[currentKey][mode].code}</pre>`;
-            
-            // Update DAG
-            const dag = document.getElementById('dagView');
-            dag.innerHTML = '';
-            scenarios[currentKey][mode].plan.forEach(node => {
-                dag.innerHTML += `<div class="dag-node">${node}</div>`;
-            });
-
-            document.getElementById('logger').innerHTML = '<div class="log-entry">Ready.</div>';
-            document.getElementById('runBtn').disabled = false;
-            document.getElementById('runBtn').innerText = "Next Step";
-            resetCluster();
-        }
-
-        function nextStep() {
-            const steps = scenarios[currentKey][currentMode].steps;
-            if (stepIdx >= steps.length) return;
-            const s = steps[stepIdx];
-            
-            const log = document.createElement('div');
-            log.className = `log-entry ${s.type || ''}`;
-            log.innerText = "> " + s.msg;
-            document.getElementById('logger').appendChild(log);
-            document.getElementById('logger').scrollTop = document.getElementById('logger').scrollHeight;
-
-            // Highlight DAG
-            const nodes = document.querySelectorAll('.dag-node');
-            if(nodes[stepIdx]) nodes[stepIdx].classList.add('active');
-
-            if(s.action) runVisual(s.action);
-            
-            stepIdx++;
-            if(stepIdx >= steps.length) {
-                document.getElementById('runBtn').innerText = "Done";
-                document.getElementById('runBtn').disabled = true;
-            }
-        }
-
-        function resetCluster() {
-            for(let i=0; i<4; i++) {
-                document.getElementById(`stage-${i}`).innerHTML = '';
-                document.getElementById(`ex${i}`).className = 'executor';
-                updateRes(i, 0, 0);
-            }
-            document.getElementById('driver').className = 'driver-node';
-            document.getElementById('driver').innerText = "DRIVER (JVM)";
-        }
-
-        function updateRes(id, ram, cpu, color) {
-            const bar = document.getElementById(`bar-${id}`);
-            bar.style.width = ram + "%";
-            bar.style.background = color || 'var(--neon-blue)';
-            document.getElementById(`ram-txt-${id}`).innerText = ram + "%";
-            if(cpu) document.getElementById(`cpu-txt-${id}`).innerText = cpu + "%";
-        }
-
-        function runVisual(act) {
-            switch(act) {
-                // SKEW / OOM
-                case 'spawn_skew': 
-                    document.getElementById('stage-0').innerHTML += `<div class="block skew">NULL</div>`;
-                    [1,2,3].forEach(i => document.getElementById(`stage-${i}`).innerHTML += `<div class="block">ID</div>`);
-                    break;
-                case 'load_bad_skew': updateRes(0, 100, 100, 'var(--neon-pink)'); break;
-                case 'crash_ex0': document.getElementById('ex0').classList.add('crashed'); break;
-                
-                // SALTING
-                case 'spawn_salt': [0,1,2,3].forEach(i => document.getElementById(`stage-${i}`).innerHTML += `<div class="block salt">Key</div>`); break;
-                case 'shuffle_good': 
-                    for(let i=0; i<4; i++) { document.getElementById(`stage-${i}`).innerHTML = ''; }
-                    setTimeout(() => [0,1,2,3].forEach(i => document.getElementById(`stage-${i}`).innerHTML += `<div class="block salt">Key</div>`), 300);
-                    break;
-                case 'load_balanced': [0,1,2,3].forEach(i => updateRes(i, 40, 30, 'var(--neon-green)')); break;
-                
-                // STANDARD
-                case 'spawn_balanced': [0,1,2,3].forEach(i => document.getElementById(`stage-${i}`).innerHTML += `<div class="block">Part</div>`); break;
-                case 'shuffle_heavy': [0,1,2,3].forEach(i => { document.getElementById(`stage-${i}`).innerHTML = ''; setTimeout(()=>document.getElementById(`stage-${i}`).innerHTML += `<div class="block">...</div>`, i*100)}); break;
-                case 'load_heavy': [0,1,2,3].forEach(i => updateRes(i, 80, 80, 'var(--neon-orange)')); break;
-                case 'broadcast': [0,1,2,3].forEach(i => document.getElementById(`stage-${i}`).innerHTML += `<div class="block salt">BC</div>`); break;
-                
-                // EXPLODE
-                case 'explode_bad': for(let k=0; k<10; k++) setTimeout(()=>document.getElementById('stage-0').innerHTML+=`<div class="block tiny">.</div>`, k*50); break;
-                case 'explode_good': [0,1,2,3].forEach(i => document.getElementById(`stage-${i}`).innerHTML += `<div class="block tiny">..</div>`); break;
-
-                // DRIVER OOM
-                case 'send_to_driver':
-                    for(let i=0; i<4; i++) {
-                        document.getElementById(`stage-${i}`).innerHTML = ''; 
-                        updateRes(i, 0, 0); // Clear execs
-                        // Animate blocks flying to driver? simplified:
-                    }
-                    document.getElementById('driver').style.background = "var(--neon-purple)";
-                    break;
-                case 'crash_driver':
-                    document.getElementById('driver').classList.add('crash');
-                    document.getElementById('driver').innerText = "OOM ERROR";
-                    break;
-                case 'send_safe_driver':
-                    [0,1,2,3].forEach(i => document.getElementById(`stage-${i}`).innerHTML = '');
-                    document.getElementById('driver').style.boxShadow = "0 0 10px var(--neon-green)";
-                    break;
-
-                // CACHING
-                case 'read_slow':
-                    [0,1,2,3].forEach(i => {
-                        document.getElementById(`stage-${i}`).innerHTML += `<div class="block slow">CSV</div>`;
-                        updateRes(i, 30, 20);
-                    });
-                    break;
-                case 'read_cache':
-                    [0,1,2,3].forEach(i => {
-                        document.getElementById(`stage-${i}`).innerHTML = `<div class="block cached">RAM</div>`;
-                        updateRes(i, 60, 10, 'var(--neon-green)');
-                    });
-                    break;
-                case 'read_ram':
-                    // Flash the cached blocks
-                    const blocks = document.querySelectorAll('.cached');
-                    blocks.forEach(b => { b.style.background = '#fff'; setTimeout(()=>b.style.background='var(--neon-blue)', 200)});
-                    break;
-
-                // UDFs
-                case 'proc_slow':
-                    [0,1,2,3].forEach(i => {
-                        document.getElementById(`stage-${i}`).innerHTML = `<div class="block slow">Py</div>`;
-                        updateRes(i, 50, 90, 'var(--neon-orange)'); // High CPU
-                    });
-                    break;
-                case 'proc_fast':
-                    [0,1,2,3].forEach(i => {
-                        document.getElementById(`stage-${i}`).innerHTML = `<div class="block salt">Arr</div>`;
-                        updateRes(i, 40, 40, 'var(--neon-green)');
-                    });
-                    break;
-            }
-        }
-
-        initScenario();
     </script>
 </body>
 </html>
