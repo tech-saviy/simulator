@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Internals Simulator</title>
+    <style>
+        :root {
+            /* Cyberpunk Palette */
+            --bg-dark: #050505;
+            --bg-panel: #0f1115;
+            --border: #2a2f3a;
+            --neon-blue: #00f3ff;
+            --neon-green: #00ff9d;
+            --neon-purple: #bc13fe;
+            --neon-red: #ff0055;
+            --text-main: #e0e6ed;
+            --text-muted: #8b9bb4;
+            
+            --font-code: 'Consolas', 'Monaco', 'Courier New', monospace;
+            --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- HEADER --- */
+        header {
+            height: 60px;
+            background: rgba(15, 17, 21, 0.9);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            backdrop-filter: blur(5px);
+            z-index: 10;
+        }
+
+        .brand {
+            font-size: 1.2rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--neon-blue);
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn:hover {
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            box-shadow: 0 0 10px rgba(188, 19, 254, 0.2);
+        }
+
+        /* --- LAYOUT GRID --- */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 300px 400px 1fr;
+            flex: 1;
+            height: calc(100vh - 60px);
+        }
+
+        /* --- PANELS --- */
+        .panel {
+            border-right: 1px solid var(--border);
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 12px 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* --- LEFT: CONTROLS --- */
+        .controls-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; flex: 1; }
+        
+        label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+        
+        select {
+            width: 100%;
+            background: var(--bg-panel);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: var(--font-ui);
+            outline: none;
+            cursor: pointer;
+        }
+        select:focus { border-color: var(--neon-blue); }
+
+        .btn-run {
+            width: 100%;
+            padding: 12px;
+            background: var(--neon-blue);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            font-weight: 800;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+        }
+        .btn-run:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(1); box-shadow: none; }
+        .btn-run:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 25px rgba(0, 243, 255, 0.5); }
+
+        .log-box {
+            flex: 1;
+            background: #000;
+            border: 1px solid var(--border);
+            padding: 10px;
+            font-family: var(--font-code);
+            font-size: 0.8rem;
+            overflow-y: auto;
+            color: var(--text-muted);
+            border-radius: 4px;
+            min-height: 200px;
+        }
+        .log-entry { margin-bottom: 8px; padding-left: 10px; border-left: 2px solid #333; line-height: 1.4; }
+        .log-entry.active { border-color: var(--neon-green); color: var(--text-main); }
+        .log-entry.highlight { color: var(--neon-blue); }
+
+        .doc-link {
+            text-align: center;
+            color: var(--neon-green);
+            text-decoration: none;
+            font-size: 0.8rem;
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 4px;
+            transition: 0.2s;
+            margin-top: auto;
+        }
+        .doc-link:hover { border-color: var(--neon-green); background: rgba(0, 255, 157, 0.1); }
+
+        /* --- CENTER: SQL EDITOR --- */
+        .sql-editor {
+            flex: 1;
+            background: #0b0d10;
+            padding: 30px;
+            font-family: var(--font-code);
+            font-size: 1rem;
+            line-height: 1.8;
+            position: relative;
+        }
+
+        .sql-line {
+            padding: 4px 10px;
+            border-radius: 4px;
+            transition: all 0.4s ease;
+            border-left: 3px solid transparent;
+            opacity: 0.6;
+        }
+
+        /* The Execution Highlight Logic */
+        .sql-line.active-step {
+            background: rgba(0, 243, 255, 0.1);
+            border-left-color: var(--neon-blue);
+            color: #fff;
+            opacity: 1;
+            transform: translateX(10px);
+            box-shadow: -5px 0 10px rgba(0, 243, 255, 0.1);
+        }
+
+        .keyword { color: var(--neon-purple); font-weight: bold; }
+        .func { color: var(--neon-blue); }
+        .str { color: var(--neon-green); }
+
+        /* --- RIGHT: DATA STAGE --- */
+        .stage-container {
+            flex: 1;
+            background: radial-gradient(circle at center, #111 0%, #050505 100%);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        /* Table Styling */
+        .data-table {
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            min-width: 300px;
+            transition: 0.5s;
+        }
+        
+        .data-table th {
+            background: #1a1e26;
+            color: var(--neon-blue);
+            padding: 10px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .data-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+            transition: 0.4s;
+        }
+
+        .table-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        /* Animations */
+        .row-hidden {
+            opacity: 0.2;
+            text-decoration: line-through;
+            color: var(--neon-red);
+            background: rgba(255, 0, 85, 0.05);
+        }
+        
+        .row-active {
+            background: rgba(0, 243, 255, 0.15);
+            color: white;
+        }
+
+        .bucket-container {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .bucket {
+            border: 1px dashed var(--text-muted);
+            padding: 10px;
+            border-radius: 6px;
+            min-width: 150px;
+        }
+        .bucket-header { font-weight: bold; color: var(--neon-purple); margin-bottom: 5px; border-bottom: 1px solid #333; }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 1000;
+            display: none; align-items: center; justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+        .modal {
+            background: var(--bg-panel); border: 1px solid var(--neon-blue);
+            padding: 30px; max-width: 600px; border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+        }
+        .modal h2 { color: var(--neon-blue); margin-top: 0; }
+        .modal ul { line-height: 1.6; color: var(--text-main); }
+        .close-btn {
+            background: var(--neon-blue); color: #000; border: none; padding: 10px 20px;
+            font-weight: bold; cursor: pointer; float: right; margin-top: 10px; border-radius: 4px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- HELP MODAL -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal">
+            <h2>🔎 SQL Internals Simulator</h2>
+            <p>Welcome. This tool visualizes the <strong>Logical Order of Execution</strong>, which is different from how you write SQL.</p>
+            <ul>
+                <li><strong>Written Order:</strong> SELECT ... FROM ... WHERE ...</li>
+                <li><strong>Logical Order:</strong> FROM (Load Data) -> WHERE (Filter) -> SELECT (Project Columns).</li>
+            </ul>
+            <p><strong>How to use:</strong></p>
+            <ul>
+                <li><strong>Left Panel:</strong> Select a scenario (e.g., Simple Filter, Join).</li>
+                <li><strong>Center Panel:</strong> Watch the code highlight jump around to show execution order.</li>
+                <li><strong>Right Panel:</strong> Watch the data tables animate (rows turning red = filtered out).</li>
+            </ul>
+            <button class="close-btn" onclick="document.getElementById('helpModal').style.display='none'">CLOSE</button>
+        </div>
+    </div>
+
+    <header>
+        <div class="brand">
+            <span>⚡</span> SQL VISUALIZER
+        </div>
+        <div style="display:flex; gap:10px;">
+            <a href="index.html" class="nav-btn">🏠 Home</a>
+            <button class="nav-btn" onclick="document.getElementById('helpModal').style.display='flex'">Help ?</button>
+        </div>
+    </header>
+
+    <div class="grid-container">
+        
+        <!-- LEFT PANEL -->
+        <div class="panel">
+            <div class="panel-header">Control Center</div>
+            <div class="controls-body">
+                <label>SCENARIO SELECTION</label>
+                <select id="scenarioSelect" onchange="initScenario()">
+                    <option value="filter">1. Simple Filter (Where)</option>
+                    <option value="join">2. Inner Join</option>
+                    <option value="group">3. Group By Aggregation</option>
+                </select>
+
+                <button id="runBtn" class="btn-run" onclick="nextStep()">▶ Next Step</button>
+
+                <div style="flex:1; display:flex; flex-direction:column;">
+                    <label>EXECUTION LOG</label>
+                    <div class="log-box" id="logger">
+                        <div class="log-entry">System Ready.</div>
+                    </div>
+                </div>
+
+                <a href="#" id="docLink" target="_blank" class="doc-link">📖 Read Official Documentation</a>
+            </div>
+        </div>
+
+        <!-- CENTER PANEL -->
+        <div class="panel">
+            <div class="panel-header">SQL Editor (Logical Highlighting)</div>
+            <div class="sql-editor" id="codeEditor">
+                <!-- Code injected here -->
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="panel">
+            <div class="panel-header">Data Stage</div>
+            <div class="stage-container" id="stage">
+                <!-- Visuals injected here -->
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* 
+           --- DATA ENGINE ---
+           Defines the SQL text, the raw data, and the execution steps (State Machine)
+        */
+        const scenarios = {
+            filter: {
+                doc: "https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-WHERE",
+                // Written Order: SELECT -> FROM -> WHERE
+                queryLines: [
+                    { id: "sel", text: "SELECT name, role" },
+                    { id: "frm", text: "FROM employees" },
+                    { id: "whr", text: "WHERE salary > 50000;" }
+                ],
+                // Logical Order: FROM -> WHERE -> SELECT
+                steps: [
+                    {
+                        lineId: "frm",
+                        msg: "1. FROM: Load 'employees' table into memory.",
+                        action: "load_table",
+                        data: [
+                            { id: 1, name: "Alice", role: "Dev", salary: 60000 },
+                            { id: 2, name: "Bob", role: "Design", salary: 45000 },
+                            { id: 3, name: "Charlie", role: "Manager", salary: 70000 }
+                        ]
+                    },
+                    {
+                        lineId: "whr",
+                        msg: "2. WHERE: Iterate rows. Filter out salary <= 50000.",
+                        action: "filter_rows",
+                        predicate: (row) => row.salary > 50000
+                    },
+                    {
+                        lineId: "sel",
+                        msg: "3. SELECT: Discard unneeded columns (id, salary). Return Result.",
+                        action: "project_cols",
+                        cols: ["name", "role"]
+                    }
+                ]
+            },
+            join: {
+                doc: "https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-JOIN",
+                queryLines: [
+                    { id: "sel", text: "SELECT e.name, d.dept_name" },
+                    { id: "frm", text: "FROM employees e" },
+                    { id: "join", text: "JOIN departments d ON e.dept_id = d.id;" }
+                ],
+                steps: [
+                    {
+                        lineId: "frm",
+                        msg: "1. FROM: Load Left Table (Employees).",
+                        action: "load_table",
+                        title: "Employees (Left)",
+                        data: [
+                            { id:1, name:"Alice", dept_id: 101 },
+                            { id:2, name:"Bob", dept_id: 102 },
+                            { id:3, name:"Eve", dept_id: 999 } // No match
+                        ]
+                    },
+                    {
+                        lineId: "join",
+                        msg: "2. JOIN: Load Right Table. Match keys (101, 102).",
+                        action: "show_join_tables",
+                        rightData: [
+                            { id:101, dept_name:"Engineering" },
+                            { id:102, dept_name:"HR" }
+                        ]
+                    },
+                    {
+                        lineId: "join",
+                        msg: "2b. ON: Filter out non-matching rows (Inner Join).",
+                        action: "visualize_join_filter"
+                    },
+                    {
+                        lineId: "sel",
+                        msg: "3. SELECT: Return combined columns.",
+                        action: "project_join_result"
+                    }
+                ]
+            },
+            group: {
+                doc: "https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-GROUP",
+                queryLines: [
+                    { id: "sel", text: "SELECT dept, COUNT(*)" },
+                    { id: "frm", text: "FROM employees" },
+                    { id: "grp", text: "GROUP BY dept;" }
+                ],
+                steps: [
+                    {
+                        lineId: "frm",
+                        msg: "1. FROM: Load raw data.",
+                        action: "load_table",
+                        data: [
+                            { name:"A", dept:"IT" },
+                            { name:"B", dept:"IT" },
+                            { name:"C", dept:"HR" },
+                            { name:"D", dept:"IT" }
+                        ]
+                    },
+                    {
+                        lineId: "grp",
+                        msg: "2. GROUP BY: Collapse rows into Buckets.",
+                        action: "make_buckets"
+                    },
+                    {
+                        lineId: "sel",
+                        msg: "3. SELECT: Calculate Aggregates per bucket.",
+                        action: "show_aggregates"
+                    }
+                ]
+            }
+        };
+
+        // --- APP STATE ---
+        let currentKey = 'filter';
+        let stepIndex = 0;
+        let tableState = []; // Holds current data for manipulation
+
+        // --- INITIALIZATION ---
+        function initScenario() {
+            currentKey = document.getElementById('scenarioSelect').value;
+            stepIndex = 0;
+            tableState = [];
+
+            // UI Reset
+            document.getElementById('stage').innerHTML = '<div style="color:#666; margin-top:50px;">Waiting to start...</div>';
+            document.getElementById('logger').innerHTML = '<div class="log-entry">System Ready.</div>';
+            document.getElementById('runBtn').disabled = false;
+            document.getElementById('runBtn').innerText = "▶ NEXT STEP";
+            document.getElementById('docLink').href = scenarios[currentKey].doc;
+
+            // Render Code Editor
+            const editor = document.getElementById('codeEditor');
+            editor.innerHTML = '';
+            scenarios[currentKey].queryLines.forEach(line => {
+                const div = document.createElement('div');
+                div.className = 'sql-line';
+                div.id = line.id;
+                // Simple Syntax Highlight
+                let html = line.text
+                    .replace(/(SELECT|FROM|WHERE|JOIN|ON|GROUP BY)/g, '<span class="keyword">$1</span>')
+                    .replace(/(COUNT|SUM|AVG)/g, '<span class="func">$1</span>');
+                div.innerHTML = html;
+                editor.appendChild(div);
+            });
+        }
+
+        function nextStep() {
+            const scenario = scenarios[currentKey];
+            if (stepIndex >= scenario.steps.length) return;
+
+            const step = scenario.steps[stepIndex];
+
+            // 1. Log
+            log(step.msg);
+
+            // 2. Highlight Code (Logical Order)
+            document.querySelectorAll('.sql-line').forEach(el => el.classList.remove('active-step'));
+            document.getElementById(step.lineId).classList.add('active-step');
+
+            // 3. Render Visuals
+            renderVisual(step);
+
+            stepIndex++;
+            if (stepIndex >= scenario.steps.length) {
+                document.getElementById('runBtn').innerText = "QUERY COMPLETE";
+                document.getElementById('runBtn').disabled = true;
+            }
+        }
+
+        function log(msg) {
+            const box = document.getElementById('logger');
+            const div = document.createElement('div');
+            div.className = 'log-entry active';
+            div.innerText = "> " + msg;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // --- VISUAL RENDERER ---
+        function renderVisual(step) {
+            const stage = document.getElementById('stage');
+
+            if (step.action === 'load_table') {
+                tableState = step.data; // Clone data
+                stage.innerHTML = createTableHTML(tableState, step.title || "Source Table");
+            } 
+            else if (step.action === 'filter_rows') {
+                // Apply visual filter styles
+                const rows = stage.querySelectorAll('tbody tr');
+                tableState.forEach((row, idx) => {
+                    if (!step.predicate(row)) {
+                        rows[idx].classList.add('row-hidden'); // Fade out
+                    } else {
+                        rows[idx].classList.add('row-active'); // Highlight keep
+                    }
+                });
+            }
+            else if (step.action === 'project_cols') {
+                // Filter data logic
+                const filtered = tableState.filter(r => r.salary > 50000); // hardcoded logic for demo simplicity
+                // Create projected object
+                const projected = filtered.map(r => ({ name: r.name, role: r.role }));
+                stage.innerHTML = createTableHTML(projected, "Final Result Set");
+            }
+            else if (step.action === 'show_join_tables') {
+                // Show side by side
+                const leftHTML = createTableHTML(tableState, "Employees");
+                const rightHTML = createTableHTML(step.rightData, "Departments");
+                stage.innerHTML = `<div style="display:flex; gap:20px; align-items:flex-start;">${leftHTML} <div style="font-size:2rem; align-self:center;">+</div> ${rightHTML}</div>`;
+            }
+            else if (step.action === 'visualize_join_filter') {
+                // Highlight matches manually for demo
+                const leftRows = stage.querySelectorAll('table:first-child tbody tr');
+                const rightRows = stage.querySelectorAll('table:last-child tbody tr');
+                
+                // Alice (101) matches Eng (101)
+                leftRows[0].classList.add('row-active'); rightRows[0].classList.add('row-active');
+                // Bob (102) matches HR (102)
+                leftRows[1].classList.add('row-active'); rightRows[1].classList.add('row-active');
+                // Eve (999) - No match
+                leftRows[2].classList.add('row-hidden');
+            }
+            else if (step.action === 'project_join_result') {
+                const res = [
+                    { name: "Alice", dept_name: "Engineering" },
+                    { name: "Bob", dept_name: "HR" }
+                ];
+                stage.innerHTML = createTableHTML(res, "Joined Result");
+            }
+            else if (step.action === 'make_buckets') {
+                // Visualize grouping
+                stage.innerHTML = `
+                    <div class="bucket-container">
+                        <div class="bucket">
+                            <div class="bucket-header">Key: IT</div>
+                            <div>{name: A}</div>
+                            <div>{name: B}</div>
+                            <div>{name: D}</div>
+                        </div>
+                        <div class="bucket">
+                            <div class="bucket-header">Key: HR</div>
+                            <div>{name: C}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            else if (step.action === 'show_aggregates') {
+                const res = [ {dept: "IT", count: 3}, {dept: "HR", count: 1} ];
+                stage.innerHTML = createTableHTML(res, "Final Aggregation");
+            }
+        }
+
+        // --- HELPER: HTML GENERATOR ---
+        function createTableHTML(data, title) {
+            if (!data || data.length === 0) return "";
+            const keys = Object.keys(data[0]);
+            
+            let html = `<div><div class="table-label">${title}</div><table class="data-table"><thead><tr>`;
+            keys.forEach(k => html += `<th>${k}</th>`);
+            html += `</tr></thead><tbody>`;
+            
+            data.forEach(row => {
+                html += `<tr>`;
+                keys.forEach(k => html += `<td>${row[k]}</td>`);
+                html += `</tr>`;
+            });
+            html += `</tbody></table></div>`;
+            return html;
+        }
+
+        // Start
+        initScenario();
+
+    </script>
+</body>
+</html>
