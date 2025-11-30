@@ -6,7 +6,6 @@
     <title>SQL Logical Simulator</title>
     <style>
         :root {
-            /* Same Cyberpunk Theme for Consistency */
             --bg-dark: #050505;
             --bg-panel: #0f1115;
             --border: #27272a;
@@ -40,21 +39,31 @@
         .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
         .log { flex: 1; background: #000; border: 1px solid var(--border); padding: 10px; font-family: var(--font-code); font-size: 0.8rem; overflow-y: auto; color: var(--text-muted); }
         
-        /* CODE */
-        .sql-area { flex: 1; background: #080a0c; padding: 30px; font-family: var(--font-code); font-size: 1.1rem; line-height: 2; }
+        /* CODE AREA */
+        .sql-area { flex: 1; background: #080a0c; padding: 30px; font-family: var(--font-code); font-size: 1.1rem; line-height: 2; position: relative; }
         .sql-line { padding: 5px 10px; border-radius: 4px; transition: 0.3s; border-left: 3px solid transparent; opacity: 0.5; }
         .active-step { opacity: 1; background: rgba(0, 255, 157, 0.1); border-left-color: var(--neon-green); transform: translateX(10px); color: white; }
         .keyword { color: var(--neon-purple); font-weight: bold; }
 
+        /* CUSTOM INPUT */
+        #customInputArea {
+            width: 100%; height: 100%; background: transparent; border: none; 
+            color: var(--neon-blue); font-family: var(--font-code); font-size: 1.1rem; resize: none; outline: none;
+            display: none;
+        }
+        #customInputArea::placeholder { color: #333; }
+
         /* VISUAL STAGE */
         .stage { flex: 1; background: radial-gradient(circle at center, #111 0%, #050505 100%); padding: 30px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 20px; }
         
-        .data-table { border-collapse: collapse; min-width: 300px; background: var(--bg-panel); border: 1px solid var(--border); font-size: 0.85rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .data-table { border-collapse: collapse; min-width: 300px; background: var(--bg-panel); border: 1px solid var(--border); font-size: 0.85rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.5s; }
         .data-table th { background: #1a1e26; color: var(--neon-green); padding: 10px; text-align: left; }
         .data-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-main); transition: 0.3s; }
         
         .filtered-out { opacity: 0.2; text-decoration: line-through; color: var(--neon-red); }
         .kept { background: rgba(0, 255, 157, 0.1); }
+
+        .db-info { font-size: 0.75rem; color: #555; margin-top: 10px; line-height: 1.4; }
 
     </style>
 </head>
@@ -77,16 +86,23 @@
                     <option value="where">1. WHERE Filter</option>
                     <option value="join">2. Inner Join</option>
                     <option value="group">3. Group By</option>
+                    <option value="custom" style="color: var(--neon-blue); font-weight:bold;">★ 4. Custom Query</option>
                 </select>
                 <button id="nextBtn" class="btn-run" onclick="nextStep()">▶ Next Step</button>
                 <div class="log" id="logger">Ready.</div>
+                <div class="db-info" id="dbInfo">
+                    <!-- DB Info injected via JS -->
+                </div>
             </div>
         </div>
 
         <!-- CENTER -->
         <div class="panel">
             <div class="panel-header">SQL Code (Execution Order Highlight)</div>
-            <div class="sql-area" id="codeEditor"></div>
+            <div class="sql-area" id="codeEditorContainer">
+                <div id="codeDisplay"></div>
+                <textarea id="customInputArea" placeholder="SELECT * FROM employees WHERE salary > 50000"></textarea>
+            </div>
         </div>
 
         <!-- RIGHT -->
@@ -100,29 +116,40 @@
         // Security
         document.onkeydown = function(e) { if(e.keyCode == 123 || (e.ctrlKey && e.keyCode == 85)) return false; }
 
+        // --- MOCK DATABASE ---
+        const DB = {
+            employees: [
+                {id: 1, name: "Alice", role: "Dev", salary: 60000, dept_id: 101},
+                {id: 2, name: "Bob", role: "Design", salary: 45000, dept_id: 102},
+                {id: 3, name: "Charlie", role: "Lead", salary: 70000, dept_id: 101},
+                {id: 4, name: "David", role: "Dev", salary: 55000, dept_id: 101},
+                {id: 5, name: "Eve", role: "HR", salary: 48000, dept_id: 102}
+            ],
+            departments: [
+                {id: 101, name: "Engineering"},
+                {id: 102, name: "Human Resources"}
+            ]
+        };
+
+        // --- PRESET SCENARIOS ---
         const scenarios = {
             where: {
                 lines: [
                     { id: "sel", text: "SELECT name, role" },
                     { id: "frm", text: "FROM employees" },
-                    { id: "whr", text: "WHERE salary > 50k" }
+                    { id: "whr", text: "WHERE salary > 50000" }
                 ],
                 steps: [
-                    { line: "frm", msg: "1. FROM: Load Table", action: "load" },
-                    { line: "whr", msg: "2. WHERE: Filter Rows", action: "filter" },
-                    { line: "sel", msg: "3. SELECT: Pick Columns", action: "select" }
-                ],
-                data: [
-                    {name: "Alice", role: "Dev", salary: 60000},
-                    {name: "Bob", role: "Design", salary: 45000},
-                    {name: "Charlie", role: "Lead", salary: 70000}
+                    { line: "frm", msg: "1. FROM: Load Table 'employees'", action: "load", table: "employees" },
+                    { line: "whr", msg: "2. WHERE: Filter Rows (salary > 50000)", action: "filter", condition: (r)=>r.salary > 50000 },
+                    { line: "sel", msg: "3. SELECT: Pick Columns (name, role)", action: "select", cols: ["name", "role"] }
                 ]
             },
             join: {
                 lines: [
-                    { id: "sel", text: "SELECT e.name, d.dept" },
+                    { id: "sel", text: "SELECT e.name, d.name" },
                     { id: "frm", text: "FROM employees e" },
-                    { id: "join", text: "JOIN depts d ON e.did = d.id" }
+                    { id: "join", text: "JOIN departments d ON e.dept_id = d.id" }
                 ],
                 steps: [
                     { line: "frm", msg: "1. FROM: Load Left Table", action: "load_left" },
@@ -132,104 +159,265 @@
             },
             group: {
                 lines: [
-                    { id: "sel", text: "SELECT dept, COUNT(*)" },
+                    { id: "sel", text: "SELECT dept_id, COUNT(*)" },
                     { id: "frm", text: "FROM employees" },
-                    { id: "grp", text: "GROUP BY dept" }
+                    { id: "grp", text: "GROUP BY dept_id" }
                 ],
                 steps: [
                     { line: "frm", msg: "1. FROM: Load Data", action: "load_group" },
-                    { line: "grp", msg: "2. GROUP BY: Bucket Rows", action: "bucket" },
-                    { line: "sel", msg: "3. SELECT: Aggregate", action: "agg" }
+                    { line: "grp", msg: "2. GROUP BY: Bucket Rows by ID", action: "bucket" },
+                    { line: "sel", msg: "3. SELECT: Aggregate Count", action: "agg" }
                 ]
             }
         };
 
-        let currentKey = 'where', stepIdx = 0;
+        // --- APP STATE ---
+        let currentKey = 'where';
+        let stepIdx = 0;
+        let generatedSteps = []; // For custom query
+        let generatedLines = []; // For custom query visualization
 
+        // --- INITIALIZATION ---
         function initSim() {
             currentKey = document.getElementById('simSelect').value;
             stepIdx = 0;
             document.getElementById('logger').innerText = "Ready.";
-            document.getElementById('nextBtn').disabled = false;
-            document.getElementById('nextBtn').innerText = "▶ Next Step";
             document.getElementById('stage').innerHTML = '<div style="color:#555; margin-top:50px;">Waiting...</div>';
-            
-            const editor = document.getElementById('codeEditor');
-            editor.innerHTML = '';
-            scenarios[currentKey].lines.forEach(l => {
-                editor.innerHTML += `<div class="sql-line" id="${l.id}">${l.text.replace(/([A-Z]+)/g, '<span class="keyword">$1</span>')}</div>`;
-            });
+            document.getElementById('dbInfo').innerHTML = `<strong>Available Tables:</strong><br>employees (id, name, role, salary, dept_id)<br>departments (id, name)`;
+
+            const display = document.getElementById('codeDisplay');
+            const customInput = document.getElementById('customInputArea');
+            const runBtn = document.getElementById('nextBtn');
+
+            if (currentKey === 'custom') {
+                // Enable Custom Mode
+                display.style.display = 'none';
+                customInput.style.display = 'block';
+                runBtn.innerText = "Parse & Run";
+                runBtn.onclick = parseAndStartCustom;
+                runBtn.disabled = false;
+            } else {
+                // Preset Mode
+                display.style.display = 'block';
+                customInput.style.display = 'none';
+                runBtn.innerText = "▶ Next Step";
+                runBtn.onclick = nextStep;
+                runBtn.disabled = false;
+
+                // Render preset lines
+                display.innerHTML = '';
+                scenarios[currentKey].lines.forEach(l => {
+                    display.innerHTML += `<div class="sql-line" id="${l.id}">${highlightSQL(l.text)}</div>`;
+                });
+            }
         }
 
+        // --- CUSTOM PARSER LOGIC ---
+        function parseAndStartCustom() {
+            const rawSql = document.getElementById('customInputArea').value.trim();
+            if(!rawSql) { alert("Please enter a SQL query."); return; }
+
+            // 1. Basic Regex Parsing
+            const fromMatch = rawSql.match(/FROM\s+(\w+)/i);
+            const whereMatch = rawSql.match(/WHERE\s+(.+)/i);
+            const selectMatch = rawSql.match(/SELECT\s+(.+?)(\s+FROM|$)/i);
+
+            if(!fromMatch) { alert("Error: FROM clause is required."); return; }
+
+            const tableName = fromMatch[1];
+            if(!DB[tableName]) { alert(`Error: Table '${tableName}' does not exist.`); return; }
+
+            // 2. Build Visualization DOM
+            const display = document.getElementById('codeDisplay');
+            const input = document.getElementById('customInputArea');
+            
+            input.style.display = 'none';
+            display.style.display = 'block';
+            display.innerHTML = '';
+
+            generatedLines = [];
+            generatedSteps = [];
+
+            // 3. Generate Logical Plan
+            // Step 1: FROM
+            const lineIdFrom = "line_frm";
+            generatedLines.push({id: lineIdFrom, text: `FROM ${tableName}`});
+            generatedSteps.push({
+                line: lineIdFrom, 
+                msg: `1. FROM: Load table '${tableName}'`, 
+                action: 'load', 
+                table: tableName
+            });
+
+            // Step 2: WHERE (Optional)
+            if(whereMatch) {
+                const conditionStr = whereMatch[1];
+                const lineIdWhere = "line_whr";
+                generatedLines.push({id: lineIdWhere, text: `WHERE ${conditionStr}`});
+                
+                // Dangerous eval replacement for simulation purposes only
+                // Convert SQL "salary > 50000" to JS "row.salary > 50000"
+                const safeCondition = conditionStr.replace(/([a-zA-Z_]+)/g, "row.$1").replace(/=/g, "==").replace(/AND/gi, "&&").replace(/OR/gi, "||");
+                
+                try {
+                    const predicate = new Function('row', `try { return ${safeCondition} } catch(e) { return false; }`);
+                    generatedSteps.push({
+                        line: lineIdWhere,
+                        msg: `2. WHERE: Filter (${conditionStr})`,
+                        action: 'filter',
+                        condition: predicate
+                    });
+                } catch(e) {
+                    console.error("Parse Error");
+                }
+            }
+
+            // Step 3: SELECT
+            const colsStr = selectMatch ? selectMatch[1] : "*";
+            const lineIdSel = "line_sel";
+            generatedLines.unshift({id: lineIdSel, text: `SELECT ${colsStr}`}); // Visual order: Select top
+            generatedSteps.push({
+                line: lineIdSel,
+                msg: `3. SELECT: Project columns (${colsStr})`,
+                action: 'select',
+                cols: colsStr.includes('*') ? Object.keys(DB[tableName][0]) : colsStr.split(',').map(s=>s.trim())
+            });
+
+            // Render Generated Code
+            generatedLines.forEach(l => {
+                display.innerHTML += `<div class="sql-line" id="${l.id}">${highlightSQL(l.text)}</div>`;
+            });
+
+            // Reset State for Execution
+            stepIdx = 0;
+            currentKey = 'custom'; // Switch context
+            document.getElementById('nextBtn').onclick = nextStep;
+            document.getElementById('nextBtn').innerText = "▶ Start Execution";
+            document.getElementById('logger').innerHTML = "<div style='color:var(--neon-blue)'>Query Parsed Successfully.</div>";
+        }
+
+        // --- EXECUTION ENGINE ---
         function nextStep() {
-            const s = scenarios[currentKey].steps;
+            let s;
+            if(currentKey === 'custom') {
+                s = generatedSteps;
+            } else {
+                s = scenarios[currentKey].steps;
+            }
+
             if(stepIdx >= s.length) return;
             
             const step = s[stepIdx];
             document.getElementById('logger').innerHTML += `<div>> ${step.msg}</div>`;
             
             document.querySelectorAll('.sql-line').forEach(el => el.classList.remove('active-step'));
-            document.getElementById(step.line).classList.add('active-step');
+            const activeLine = document.getElementById(step.line);
+            if(activeLine) activeLine.classList.add('active-step');
 
-            runVisual(step.action);
+            runVisual(step.action, step);
 
             stepIdx++;
             if(stepIdx >= s.length) {
                 document.getElementById('nextBtn').innerText = "Done";
                 document.getElementById('nextBtn').disabled = true;
+            } else {
+                document.getElementById('nextBtn').innerText = "▶ Next Step";
             }
         }
 
-        function runVisual(act) {
+        function runVisual(act, params) {
             const stage = document.getElementById('stage');
-            const data = scenarios.where.data;
-
+            
+            // Common Actions
             if(act === 'load') {
-                stage.innerHTML = makeTable(data, ['name','role','salary']);
-            } else if(act === 'filter') {
+                const data = DB[params.table];
+                const cols = Object.keys(data[0]);
+                stage.innerHTML = makeTable(data, cols);
+                // Store data in DOM property for next steps
+                stage.dataset.currentData = JSON.stringify(data);
+            } 
+            else if(act === 'filter') {
                 const rows = stage.querySelectorAll('tbody tr');
-                rows[1].classList.add('filtered-out'); // Bob
-                rows[0].classList.add('kept');
-                rows[2].classList.add('kept');
-            } else if(act === 'select') {
-                stage.innerHTML = makeTable([{name:"Alice", role:"Dev"}, {name:"Charlie", role:"Lead"}], ['name','role']);
+                const data = JSON.parse(stage.dataset.currentData);
+                
+                data.forEach((row, index) => {
+                    if(params.condition(row)) {
+                        rows[index].classList.add('kept');
+                    } else {
+                        rows[index].classList.add('filtered-out');
+                    }
+                });
+            } 
+            else if(act === 'select') {
+                // Simple visualization: clear table and show projected result
+                // In a real filter scenario, we'd only take 'kept' rows.
+                // For sim, we re-render simplistic logic based on previous data
+                let data = JSON.parse(stage.dataset.currentData);
+                
+                // If we came from a filter step, apply filter again to get final dataset
+                if(stepIdx > 0 && (currentKey === 'custom' || currentKey === 'where')) {
+                     // Check if previous step was filter
+                     // Hacky check for custom mode
+                     if(currentKey === 'custom' && generatedSteps.length > 2) {
+                         data = data.filter(params.condition || generatedSteps[1].condition); 
+                     } else if (currentKey === 'where') {
+                         data = data.filter(r => r.salary > 50000);
+                     }
+                }
+
+                stage.innerHTML = makeTable(data, params.cols);
             } 
             
-            // Join Logic
+            // Preset Join Logic
             else if(act === 'load_left') {
-                stage.innerHTML = makeTable([{id:1, name:"Alice", did:101}, {id:2, name:"Bob", did:102}], ['id','name','did']);
+                stage.innerHTML = makeTable(DB.employees.slice(0,3), ['id','name','dept_id']);
             } else if(act === 'show_join') {
                 stage.innerHTML += `<div style="font-size:2rem; color:var(--neon-blue);">+</div>`;
-                stage.innerHTML += makeTable([{id:101, dept:"Eng"}, {id:102, dept:"HR"}], ['id','dept']);
+                stage.innerHTML += makeTable(DB.departments, ['id','name']);
             } else if(act === 'show_result') {
-                stage.innerHTML = makeTable([{name:"Alice", dept:"Eng"}, {name:"Bob", dept:"HR"}], ['name','dept']);
+                const res = [
+                    {name: "Alice", dept: "Engineering"},
+                    {name: "Bob", dept: "Human Resources"}
+                ];
+                stage.innerHTML = makeTable(res, ['name','dept']);
             }
 
-            // Group Logic
+            // Preset Group Logic
             else if(act === 'load_group') {
-                stage.innerHTML = makeTable([{name:"A", dept:"IT"}, {name:"B", dept:"IT"}, {name:"C", dept:"HR"}], ['name','dept']);
+                stage.innerHTML = makeTable(DB.employees.slice(0,4), ['name','dept_id']);
             } else if(act === 'bucket') {
                 stage.innerHTML = `
-                    <div style="border:1px dashed #555; padding:10px; width:100%;">
-                        <strong style="color:var(--neon-green)">IT Bucket</strong>
-                        <div>{name: A}, {name: B}</div>
+                    <div style="border:1px dashed #555; padding:10px; width:100%; margin-bottom:10px;">
+                        <strong style="color:var(--neon-green)">Bucket 101</strong>
+                        <div>Alice, Charlie, David</div>
                     </div>
                     <div style="border:1px dashed #555; padding:10px; width:100%;">
-                        <strong style="color:var(--neon-green)">HR Bucket</strong>
-                        <div>{name: C}</div>
+                        <strong style="color:var(--neon-green)">Bucket 102</strong>
+                        <div>Bob</div>
                     </div>
                 `;
             } else if(act === 'agg') {
-                stage.innerHTML = makeTable([{dept:"IT", count:2}, {dept:"HR", count:1}], ['dept','count']);
+                stage.innerHTML = makeTable([{dept_id:101, count:3}, {dept_id:102, count:1}], ['dept_id','count']);
             }
         }
 
+        // Utils
         function makeTable(rows, keys) {
-            let h = `<table class="data-table"><thead><tr>${keys.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>`;
+            if(rows.length === 0) return "<div>No Results</div>";
+            
+            // Handle SELECT * in custom mode
+            let actualKeys = keys;
+            if(keys[0] === '*') actualKeys = Object.keys(rows[0]);
+
+            let h = `<table class="data-table"><thead><tr>${actualKeys.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>`;
             rows.forEach(r => {
-                h += `<tr>${keys.map(k=>`<td>${r[k]}</td>`).join('')}</tr>`;
+                h += `<tr>${actualKeys.map(k=>`<td>${r[k] !== undefined ? r[k] : ''}</td>`).join('')}</tr>`;
             });
             return h + `</tbody></table>`;
+        }
+
+        function highlightSQL(text) {
+            return text.replace(/(SELECT|FROM|WHERE|JOIN|ON|GROUP BY)/gi, '<span class="keyword">$1</span>');
         }
 
         initSim();
