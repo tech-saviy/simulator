@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PySpark Ultimate Simulator v3.0</title>
+    <style>
+        :root {
+            /* Cyberpunk Theme Palette */
+            --bg-dark: #09090b;       /* Deepest Black */
+            --bg-panel: #18181b;      /* Panel Grey */
+            --border: #27272a;        /* Border Grey */
+            
+            --neon-blue: #06b6d4;     /* Cyan/Blue (Info/Normal) */
+            --neon-pink: #f43f5e;     /* Pink/Red (Error/Bad) */
+            --neon-green: #10b981;    /* Green (Success/Good) */
+            --neon-purple: #8b5cf6;   /* Purple (Driver/Master) */
+            
+            --text-main: #e4e4e7;
+            --text-muted: #a1a1aa;
+            
+            --font-code: 'Menlo', 'Monaco', 'Courier New', monospace;
+            --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- HEADER --- */
+        header {
+            height: 60px;
+            background: rgba(24, 24, 27, 0.8);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 25px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        .brand {
+            font-size: 1.2rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-actions button {
+            background: var(--border);
+            color: var(--text-muted);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .header-actions button:hover { background: var(--neon-purple); color: white; }
+
+        /* --- LAYOUT GRID --- */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 320px 450px 1fr; /* Fixed Left, Fixed Center, Fluid Right */
+            flex: 1;
+            height: calc(100vh - 60px);
+        }
+
+        /* --- PANEL COMMON STYLES --- */
+        .panel {
+            border-right: 1px solid var(--border);
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-header {
+            padding: 12px 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-panel);
+        }
+
+        /* --- LEFT PANEL: CONTROLS --- */
+        .controls-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+        
+        .control-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
+        select {
+            width: 100%;
+            background: var(--bg-panel);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 6px;
+            font-family: var(--font-ui);
+            cursor: pointer;
+            outline: none;
+        }
+        select:focus { border-color: var(--neon-blue); }
+
+        .toggle-switch {
+            display: flex;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 4px;
+        }
+        .toggle-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .toggle-btn.active-bad { background: rgba(244, 63, 94, 0.15); color: var(--neon-pink); }
+        .toggle-btn.active-good { background: rgba(16, 185, 129, 0.15); color: var(--neon-green); }
+
+        .btn-run {
+            width: 100%;
+            padding: 14px;
+            background: var(--neon-blue);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+        }
+        .btn-run:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 25px rgba(6, 182, 212, 0.5); }
+        .btn-run:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        .log-box {
+            flex: 1;
+            background: #000;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 10px;
+            font-family: var(--font-code);
+            font-size: 0.8rem;
+            overflow-y: auto;
+            color: var(--text-muted);
+        }
+        .log-entry { margin-bottom: 6px; padding-left: 8px; border-left: 2px solid #333; }
+        .log-entry.info { border-color: var(--neon-blue); color: var(--text-main); }
+        .log-entry.error { border-color: var(--neon-pink); color: var(--neon-pink); }
+        .log-entry.success { border-color: var(--neon-green); color: var(--neon-green); }
+
+        .doc-btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            text-decoration: none;
+            color: var(--neon-purple);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: 0.2s;
+            margin-top: auto; /* Push to bottom */
+        }
+        .doc-btn:hover { border-color: var(--neon-purple); background: rgba(139, 92, 246, 0.1); }
+
+        /* --- CENTER PANEL: CODE & LOGIC --- */
+        .code-window {
+            flex: 1;
+            background: #0e0e11; /* IDE Black */
+            overflow: auto;
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        pre { margin: 0; font-family: var(--font-code); font-size: 0.85rem; line-height: 1.6; color: #a6accd; }
+        
+        /* Syntax Highlighting Sim */
+        .kwd { color: #c792ea; font-weight: bold; } /* Keywords (Purple) */
+        .str { color: #c3e88d; } /* Strings (Green) */
+        .fn { color: #82aaff; } /* Functions (Blue) */
+        .com { color: #676e95; font-style: italic; } /* Comments (Grey) */
+        .bad-highlight { background: rgba(244, 63, 94, 0.1); border-left: 3px solid var(--neon-pink); padding-left: 10px; display:block; }
+        .good-highlight { background: rgba(16, 185, 129, 0.1); border-left: 3px solid var(--neon-green); padding-left: 10px; display:block; }
+
+        .plan-window {
+            height: 35%;
+            background: var(--bg-panel);
+            padding: 15px;
+            overflow-y: auto;
+        }
+        .dag-node {
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            color: var(--text-muted);
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            text-align: center;
+            font-family: var(--font-code);
+            font-size: 0.75rem;
+            position: relative;
+            transition: 0.3s;
+        }
+        .dag-node::after { content: '↓'; position: absolute; bottom: -14px; left: 50%; color: #3f3f46; }
+        .dag-node:last-child::after { content: none; }
+        .dag-node.active { border-color: var(--neon-blue); color: #fff; box-shadow: 0 0 10px rgba(6, 182, 212, 0.2); }
+
+        /* --- RIGHT PANEL: CLUSTER VISUALIZER --- */
+        .cluster-stage {
+            flex: 1;
+            background-image: 
+                radial-gradient(circle at 50% 50%, #18181b 1px, transparent 1px);
+            background-size: 20px 20px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .driver-node {
+            align-self: center;
+            width: 160px;
+            padding: 15px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 2px solid var(--neon-purple);
+            border-radius: 8px;
+            text-align: center;
+            color: var(--neon-purple);
+            font-weight: 700;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+        }
+
+        .executor-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            flex: 1;
+        }
+
+        .executor {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: 0.3s;
+        }
+        .executor.crashed { border-color: var(--neon-pink); box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); opacity: 0.8; }
+        .executor.crashed::after { content: 'CRASHED'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--neon-pink); font-weight: 900; font-size: 1.5rem; transform: translate(-50%,-50%) rotate(-10deg); border: 4px solid var(--neon-pink); padding: 5px 10px; }
+        
+        .executor-header { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; font-weight: bold; }
+
+        /* Resource Bars */
+        .res-group { margin-bottom: 8px; }
+        .res-meta { display: flex; justify-content: space-between; font-size: 0.65rem; color: #71717a; margin-bottom: 3px; }
+        .res-track { height: 6px; background: #27272a; border-radius: 3px; overflow: hidden; }
+        .res-fill { height: 100%; width: 0%; background: var(--neon-blue); transition: width 0.4s ease, background 0.2s; }
+        
+        /* Data Container */
+        .data-pool {
+            flex: 1;
+            border: 1px dashed #3f3f46;
+            border-radius: 4px;
+            margin-top: 10px;
+            position: relative;
+            padding: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 6px;
+        }
+
+        /* Blocks */
+        .block {
+            width: 30px; height: 30px;
+            background: var(--neon-blue);
+            color: #000;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.65rem; font-weight: 800;
+            animation: spawn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.5s ease;
+        }
+        .block.skew { width: 90px; background: var(--neon-pink); color: white; }
+        .block.salt { background: var(--neon-green); color: white; border: 1px solid #fff; }
+        .block.broadcast { background: var(--neon-green); border: 2px solid #fff; }
+        .block.tiny { width: 14px; height: 14px; font-size: 0; }
+        .block.spill::before { content: '💾'; font-size: 1rem; position: absolute; }
+
+        @keyframes spawn { from { transform: scale(0); } to { transform: scale(1); } }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <span>⚡</span> PYSPARK SIMULATOR
+        </div>
+        <div class="header-actions">
+            <button onclick="alert('Visualize Spark Internals: Select a scenario to see how code affects the cluster.')">Help</button>
+        </div>
+    </header>
+
+    <div class="grid-container">
+        
+        <!-- LEFT PANEL: CONFIGURATION -->
+        <div class="panel">
+            <div class="panel-header">Control Center</div>
+            <div class="controls-body">
+                <div class="control-group">
+                    <label>SCENARIO SELECTOR</label>
+                    <select id="scenarioSelect" onchange="initScenario()">
+                        <optgroup label="Architecture">
+                            <option value="lazy">Lazy Evaluation vs Action</option>
+                            <option value="wide">Narrow vs Wide (Shuffle)</option>
+                        </optgroup>
+                        <optgroup label="Joins & Skew">
+                            <option value="skew">Skewed Join (OOM)</option>
+                            <option value="broadcast">Broadcast Join</option>
+                            <option value="cartesian">Cartesian Product</option>
+                        </optgroup>
+                        <optgroup label="Partitioning">
+                            <option value="repartition">Repartition vs Coalesce</option>
+                            <option value="smallfiles">Small Files Problem</option>
+                        </optgroup>
+                        <optgroup label="Memory & Performance">
+                            <option value="driveroom">Driver OOM (Collect)</option>
+                            <option value="execoom">Executor OOM (Explode)</option>
+                            <option value="spill">Disk Spill</option>
+                            <option value="udf">Python UDF vs Pandas</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="toggle-switch">
+                    <button id="btnBad" class="toggle-btn active-bad" onclick="setMode('bad')">⚠️ PROBLEM</button>
+                    <button id="btnGood" class="toggle-btn" onclick="setMode('good')">✅ FIXED</button>
+                </div>
+
+                <button id="runBtn" class="btn-run" onclick="nextStep()">Start Simulation</button>
+
+                <div class="control-group" style="flex:1; display:flex; flex-direction:column;">
+                    <label>EXECUTION LOG</label>
+                    <div class="log-box" id="logger">
+                        <div class="log-entry info">System initialized.</div>
+                    </div>
+                </div>
+
+                <a href="#" id="docLink" target="_blank" class="doc-btn">
+                    📖 Open Official Docs
+                </a>
+            </div>
+        </div>
+
+        <!-- CENTER PANEL: CODE -->
+        <div class="panel">
+            <div class="panel-header">PySpark Code & Plan</div>
+            <div class="code-window" id="codeView">
+                <!-- Injected via JS -->
+            </div>
+            <div class="panel-header">Physical Plan (DAG)</div>
+            <div class="plan-window" id="dagView">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: CLUSTER -->
+        <div class="panel">
+            <div class="panel-header">Cluster Backend (4 Executors)</div>
+            <div class="cluster-stage">
+                <div class="driver-node" id="driver">DRIVER<br><span style="font-size:0.7rem; opacity:0.7;">SparkContext</span></div>
+                
+                <div class="executor-grid">
+                    <!-- Generating 4 Executors -->
+                    <script>
+                        for(let i=0; i<4; i++) {
+                            document.write(`
+                                <div class="executor" id="ex${i}">
+                                    <div class="executor-header">
+                                        <span>Executor ${i+1}</span>
+                                        <span>10.0.0.${i+1}</span>
+                                    </div>
+                                    <div class="res-group">
+                                        <div class="res-meta"><span>CPU</span><span id="cpu-txt-${i}">0%</span></div>
+                                        <div class="res-track"><div class="res-fill" id="cpu-${i}"></div></div>
+                                    </div>
+                                    <div class="res-group">
+                                        <div class="res-meta"><span>RAM</span><span id="ram-txt-${i}">0%</span></div>
+                                        <div class="res-track"><div class="res-fill" id="ram-${i}"></div></div>
+                                    </div>
+                                    <div class="data-pool" id="stage-${i}"></div>
+                                </div>
+                            `);
+                        }
+                    </script>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* 
+           --- SCENARIO DATABASE --- 
+           Includes Code, Doc Links, DAG Plans, and Visual Steps 
+        */
+        const scenarios = {
+            skew: {
+                link: "https://spark.apache.org/docs/latest/sql-performance-tuning.html",
+                bad: {
+                    code: `<span class="com"># ❌ PROBLEM: Skewed Join</span>
+df1 = spark.read.parquet("txns")
+df2 = spark.read.parquet("users")
+
+<span class="com"># Join on 'user_id' where 90% are NULL</span>
+<span class="bad-highlight">joined = df1.join(df2, "user_id")</span>
+
+<span class="com"># Result: All NULLs go to Executor 1.</span>
+<span class="com"># Executor 1 crashes (OOM).</span>`,
+                    plan: ["Scan Parquet", "Exchange hashpartitioning(user_id)", "SortMergeJoin"],
+                    steps: [
+                        { msg: "Stage 0: Reading Data.", action: "spawn_skew_source" },
+                        { msg: "Shuffle: Hashing keys...", type: "info" },
+                        { msg: "All 'NULL' keys sent to Executor 1.", action: "shuffle_skew_bad" },
+                        { msg: "Executor 1 Overloaded (CPU/RAM).", action: "load_skew_bad" },
+                        { msg: "CRASH: OOM Error.", action: "crash_ex0" }
+                    ]
+                },
+                good: {
+                    code: `<span class="com"># ✅ FIX: Salting</span>
+from pyspark.sql.functions import rand, concat
+
+<span class="com"># Add random number (0-3) to spread keys</span>
+<span class="good-highlight">df1 = df1.withColumn("salt", (rand()*4).cast("int"))</span>
+<span class="good-highlight">df1 = df1.join(df2, concat("user_id", "salt"))</span>
+
+<span class="com"># Result: Even distribution.</span>`,
+                    plan: ["Scan", "Project (Salt)", "Exchange hashpartitioning(salted)", "SortMergeJoin"],
+                    steps: [
+                        { msg: "Generating Salted Keys...", action: "spawn_salt" },
+                        { msg: "Shuffle: Distributing Salted Keys.", action: "shuffle_salt" },
+                        { msg: "Load Balanced across cluster.", action: "load_balanced" },
+                        { msg: "Join Success.", type: "success" }
+                    ]
+                }
+            },
+            wide: {
+                link: "https://spark.apache.org/docs/latest/rdd-programming-guide.html#shuffle-operations",
+                bad: {
+                    code: `<span class="com"># ❌ PROBLEM: Wide Transformation</span>
+rdd = sc.textFile("logs")
+pairs = rdd.map(lambda x: (x, 1))
+
+<span class="com"># Shuffles ALL raw data across network</span>
+<span class="bad-highlight">grouped = pairs.groupByKey().mapValues(sum)</span>`,
+                    plan: ["Map", "Shuffle Exchange (Full)", "MapValues"],
+                    steps: [
+                        { msg: "Mapping Data.", action: "spawn_balanced" },
+                        { msg: "groupByKey: Moving ALL data across network.", action: "shuffle_anim" },
+                        { msg: "High Network I/O detected.", action: "load_heavy" }
+                    ]
+                },
+                good: {
+                    code: `<span class="com"># ✅ FIX: Narrow(ish) Transformation</span>
+rdd = sc.textFile("logs")
+pairs = rdd.map(lambda x: (x, 1))
+
+<span class="com"># Sums LOCALLY first (Map-Side Combine)</span>
+<span class="good-highlight">reduced = pairs.reduceByKey(lambda a,b: a+b)</span>`,
+                    plan: ["Map", "Local Combine", "Shuffle Exchange (Sums)", "Reduce"],
+                    steps: [
+                        { msg: "Map-Side Combine (Local Sum).", action: "spawn_balanced" },
+                        { msg: "Shuffle: Sending small sums only.", action: "load_balanced" },
+                        { msg: "Fast Execution.", type: "success" }
+                    ]
+                }
+            },
+            broadcast: {
+                link: "https://spark.apache.org/docs/latest/sql-performance-tuning.html#broadcast-hint-for-sql-queries",
+                bad: {
+                    code: `<span class="com"># ❌ PROBLEM: Standard Join</span>
+big = spark.read.parquet("sales_1tb")
+small = spark.read.parquet("codes_50mb")
+
+<span class="com"># Shuffles BOTH tables (Slow)</span>
+<span class="bad-highlight">res = big.join(small, "code_id")</span>`,
+                    plan: ["Scan Big", "Scan Small", "Exchange (Big)", "Exchange (Small)", "SortMergeJoin"],
+                    steps: [
+                        { msg: "Reading Tables.", action: "spawn_balanced" },
+                        { msg: "Shuffling TBs of data...", action: "shuffle_anim" },
+                        { msg: "Waiting for Network...", action: "load_heavy" }
+                    ]
+                },
+                good: {
+                    code: `<span class="com"># ✅ FIX: Broadcast Join</span>
+from pyspark.sql.functions import broadcast
+
+<span class="com"># Sends copy of 'small' to all nodes</span>
+<span class="good-highlight">res = big.join(broadcast(small), "code_id")</span>`,
+                    plan: ["Scan Big", "BroadcastExchange (Small)", "BroadcastHashJoin"],
+                    steps: [
+                        { msg: "Driver reads Small Table.", type: "info" },
+                        { msg: "Broadcasting Copy to all Executors.", action: "broadcast_anim" },
+                        { msg: "Local Map-Side Join (Instant).", action: "load_balanced" }
+                    ]
+                }
+            },
+            execoom: {
+                link: "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.explode.html",
+                bad: {
+                    code: `<span class="com"># ❌ PROBLEM: Explode on Skew</span>
+<span class="com"># Row has array of 1M items</span>
+<span class="bad-highlight">df.select(explode("items"))</span>
+
+<span class="com"># One Executor generates 1M rows in RAM</span>`,
+                    plan: ["Scan", "Generate (Explode)", "Result"],
+                    steps: [
+                        { msg: "Reading Nested Data.", action: "spawn_skew_source" },
+                        { msg: "Exploding Arrays...", action: "explode_bad" },
+                        { msg: "RAM Limit Exceeded.", action: "load_skew_bad" },
+                        { msg: "CRASH: GC Limit Overhead.", action: "crash_ex0" }
+                    ]
+                },
+                good: {
+                    code: `<span class="com"># ✅ FIX: Repartition First</span>
+<span class="com"># Spread source rows to all nodes</span>
+<span class="good-highlight">df.repartition(100).select(explode("items"))</span>`,
+                    plan: ["Scan", "Exchange RoundRobin", "Generate (Explode)"],
+                    steps: [
+                        { msg: "Repartitioning Source Data...", action: "shuffle_salt" },
+                        { msg: "Exploding in parallel.", action: "explode_good" },
+                        { msg: "Success.", type: "success" }
+                    ]
+                }
+            },
+            spill: {
+                link: "https://spark.apache.org/docs/latest/configuration.html#memory-management",
+                bad: {
+                    code: `<span class="com"># ❌ PROBLEM: Disk Spill</span>
+<span class="com"># Partition size > RAM</span>
+<span class="bad-highlight">df.sort("timestamp")</span>`,
+                    plan: ["Scan", "Exchange RangePartitioning", "Sort"],
+                    steps: [
+                        { msg: "Reading Data.", action: "spawn_balanced" },
+                        { msg: "Sorting in Memory...", action: "load_heavy" },
+                        { msg: "RAM Full! Spilling to Disk.", action: "spill_anim" },
+                        { msg: "Slow Disk I/O detected.", type: "error" }
+                    ]
+                },
+                good: {
+                    code: `<span class="com"># ✅ FIX: Increase Partitions</span>
+<span class="com"># Makes task input smaller</span>
+<span class="good-highlight">df.repartition(200).sort("timestamp")</span>`,
+                    plan: ["Scan", "Exchange (200 partitions)", "Sort"],
+                    steps: [
+                        { msg: "Repartitioning (Smaller chunks).", action: "spawn_tiny" },
+                        { msg: "Sorting fits in RAM.", action: "load_balanced" },
+                        { msg: "Fast execution.", type: "success" }
+                    ]
+                }
+            },
+            lazy: { link: "https://spark.apache.org/docs/latest/rdd-programming-guide.html#transformations", bad: { code: `df = spark.read.parquet("data")\n<span class="bad-highlight">df = df.filter(col("id") > 100)</span>\n<span class="com"># No Action called. No Job.</span>`, plan: ["Logical Plan Only"], steps: [{msg:"DAG built. No Cluster activity.", type:"info"}] }, good: { code: `df = df.filter(col("id") > 100)\n<span class="good-highlight">df.count()</span>\n<span class="com"># Action triggers execution</span>`, plan: ["Scan", "Filter", "Count"], steps: [{msg:"Action! Job Launched.", type:"success"}, {msg:"Processing...", action:"spawn_balanced"}] } },
+            cartesian: { link: "https://spark.apache.org/docs/latest/sql-performance-tuning.html", bad: { code: `df1.crossJoin(df2)`, plan: ["CartesianProduct"], steps: [{msg:"Exploding Rows (MxN)...", action:"explode_bad"}, {msg:"Cluster Frozen.", action:"load_heavy"}] }, good: { code: `df1.join(df2, "id")`, plan: ["SortMergeJoin"], steps: [{msg:"Standard Join.", action:"load_balanced"}] } },
+            smallfiles: { link: "https://spark.apache.org/docs/latest/sql-performance-tuning.html", bad: { code: `df.write.parquet("out")`, plan: ["InsertIntoHadoopFs"], steps: [{msg:"Writing 1000 tiny files...", action:"spawn_tiny"}, {msg:"Metadata overhead.", type:"error"}] }, good: { code: `df.coalesce(10).write...`, plan: ["Coalesce", "InsertIntoHadoopFs"], steps: [{msg:"Merging partitions...", action:"load_balanced"}, {msg:"Writing large files.", type:"success"}] } },
+            driveroom: { link: "https://spark.apache.org/docs/latest/configuration.html#application-properties", bad: { code: `df.collect()`, plan: ["Collect"], steps: [{msg:"Sending data to Driver...", action:"to_driver"}, {msg:"Driver OOM!", action:"crash_driver"}] }, good: { code: `df.limit(10).collect()`, plan: ["Limit", "Collect"], steps: [{msg:"Sending 10 rows.", action:"to_driver"}, {msg:"Success.", type:"success"}] } },
+            udf: { link: "https://spark.apache.org/docs/latest/api/python/user_guide/sql/arrow_pandas.html", bad: { code: `udf(lambda x: x*2)`, plan: ["BatchEvalPython"], steps: [{msg:"Serializing Rows...", action:"load_heavy"}, {msg:"Slow Python execution.", type:"error"}] }, good: { code: `pandas_udf(func)`, plan: ["ArrowEvalPython"], steps: [{msg:"Vectorized Batch.", action:"load_balanced"}, {msg:"Fast Arrow execution.", type:"success"}] } }
+        };
+
+        // --- STATE & ENGINE ---
+        let currentKey = 'skew';
+        let currentMode = 'bad';
+        let stepIdx = 0;
+
+        function initScenario() {
+            currentKey = document.getElementById('scenarioSelect').value;
+            setMode('bad');
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            stepIdx = 0;
+            
+            // UI Toggle States
+            document.getElementById('btnBad').className = `toggle-btn ${mode === 'bad' ? 'active-bad' : ''}`;
+            document.getElementById('btnGood').className = `toggle-btn ${mode === 'good' ? 'active-good' : ''}`;
+
+            // Reset Logs & Cluster
+            document.getElementById('logger').innerHTML = '<div class="log-entry info">Ready.</div>';
+            resetCluster();
+            document.getElementById('runBtn').disabled = false;
+            document.getElementById('runBtn').innerText = "Step Forward";
+
+            // Load Content
+            const data = scenarios[currentKey][mode];
+            document.getElementById('codeView').innerHTML = `<pre>${data.code}</pre>`;
+            document.getElementById('docLink').href = scenarios[currentKey].link;
+
+            // Load DAG
+            const dagEl = document.getElementById('dagView');
+            dagEl.innerHTML = '';
+            data.plan.forEach((node, i) => {
+                const el = document.createElement('div');
+                el.className = 'dag-node';
+                el.innerText = node;
+                el.id = `dag-${i}`;
+                dagEl.appendChild(el);
+            });
+        }
+
+        function nextStep() {
+            const steps = scenarios[currentKey][currentMode].steps;
+            if (stepIdx >= steps.length) return;
+
+            const step = steps[stepIdx];
+            log(step.msg, step.type || "info");
+
+            // Highlight DAG
+            const dagNode = document.getElementById(`dag-${stepIdx}`);
+            if(dagNode) dagNode.classList.add('active');
+
+            if (step.action) executeVisual(step.action);
+
+            stepIdx++;
+            if (stepIdx >= steps.length) {
+                document.getElementById('runBtn').innerText = "DONE";
+                document.getElementById('runBtn').disabled = true;
+            }
+        }
+
+        function log(msg, type) {
+            const box = document.getElementById('logger');
+            const div = document.createElement('div');
+            div.className = `log-entry ${type}`;
+            div.innerText = msg;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function resetCluster() {
+            for(let i=0; i<4; i++) {
+                document.getElementById(`stage-${i}`).innerHTML = '';
+                document.getElementById(`ex${i}`).className = 'executor';
+                updateRes(i, 0, 0);
+            }
+            document.getElementById('driver').style.borderColor = 'var(--neon-purple)';
+            document.getElementById('driver').style.background = 'rgba(139, 92, 246, 0.1)';
+        }
+
+        // --- VISUAL ENGINE HANDLERS ---
+        function executeVisual(action) {
+            switch(action) {
+                case 'spawn_balanced':
+                    [0,1,2,3].forEach(i => { spawnBlock(i, "P"+i); updateRes(i, 30, 20); });
+                    break;
+                case 'spawn_skew_source':
+                    spawnBlock(0, "NULL", "skew");
+                    spawnBlock(1, "ID:1"); spawnBlock(2, "ID:2"); spawnBlock(3, "ID:3");
+                    break;
+                case 'shuffle_skew_bad':
+                    clearStages();
+                    spawnBlock(0, "NULL", "skew"); spawnBlock(0, "NULL", "skew");
+                    spawnBlock(1, ""); spawnBlock(2, "");
+                    break;
+                case 'load_skew_bad':
+                    updateRes(0, 100, 100, 'var(--neon-pink)');
+                    break;
+                case 'crash_ex0':
+                    document.getElementById('ex0').classList.add('crashed');
+                    break;
+                case 'spawn_salt':
+                    spawnBlock(0, "N_0", "salt"); spawnBlock(1, "N_1", "salt");
+                    spawnBlock(2, "N_2", "salt"); spawnBlock(3, "ID", "salt");
+                    break;
+                case 'shuffle_salt':
+                    clearStages();
+                    setTimeout(() => {
+                        [0,1,2,3].forEach(i => { spawnBlock(i, "Key", "salt"); updateRes(i, 40, 40, 'var(--neon-green)'); });
+                    }, 300);
+                    break;
+                case 'load_balanced':
+                    [0,1,2,3].forEach(i => updateRes(i, 40, 40, 'var(--neon-green)'));
+                    break;
+                case 'shuffle_anim':
+                    clearStages();
+                    [0,1,2,3].forEach(i => {
+                        setTimeout(() => spawnBlock(i, "Shuf"), i*100);
+                        updateRes(i, 60, 50, 'var(--neon-blue)');
+                    });
+                    break;
+                case 'broadcast_anim':
+                    [0,1,2,3].forEach(i => {
+                        spawnBlock(i, "BC", "broadcast");
+                        updateRes(i, 20, 30, 'var(--neon-green)');
+                    });
+                    break;
+                case 'explode_bad':
+                    for(let i=0; i<10; i++) { setTimeout(() => spawnBlock(0, "Row", "tiny"), i*50); }
+                    break;
+                case 'explode_good':
+                    [0,1,2,3].forEach(i => { spawnBlock(i, "Row", "tiny"); spawnBlock(i, "Row", "tiny"); });
+                    break;
+                case 'spill_anim':
+                    updateRes(0, 100, 100, 'orange');
+                    const b = document.createElement('div');
+                    b.className = 'block spill';
+                    document.getElementById('stage-0').appendChild(b);
+                    break;
+                case 'to_driver':
+                    [0,1,2,3].forEach(i => {
+                        document.getElementById(`stage-${i}`).innerHTML = '';
+                        const d = document.getElementById('driver');
+                        d.style.background = 'var(--neon-blue)';
+                        setTimeout(() => d.style.background='rgba(139, 92, 246, 0.1)', 500);
+                    });
+                    break;
+                case 'crash_driver':
+                    const d = document.getElementById('driver');
+                    d.style.borderColor = 'var(--neon-pink)';
+                    d.style.background = 'rgba(244, 63, 94, 0.2)';
+                    d.innerText = "OOM ERROR";
+                    break;
+                case 'spawn_tiny':
+                    [0,1,2,3].forEach(i => spawnBlock(i, "p", "tiny"));
+                    break;
+                case 'load_heavy':
+                    [0,1,2,3].forEach(i => updateRes(i, 90, 80, 'orange'));
+                    break;
+            }
+        }
+
+        // --- UTILS ---
+        function spawnBlock(id, text, type='') {
+            const div = document.createElement('div');
+            div.className = `block ${type}`;
+            div.innerText = text;
+            document.getElementById(`stage-${id}`).appendChild(div);
+        }
+        function clearStages() {
+            for(let i=0; i<4; i++) document.getElementById(`stage-${i}`).innerHTML = '';
+        }
+        function updateRes(id, cpu, ram, color) {
+            const c = document.getElementById(`cpu-${id}`);
+            const r = document.getElementById(`ram-${id}`);
+            c.style.width = cpu + '%';
+            r.style.width = ram + '%';
+            c.style.background = color || 'var(--neon-blue)';
+            r.style.background = color || 'var(--neon-blue)';
+            document.getElementById(`cpu-txt-${id}`).innerText = cpu + '%';
+            document.getElementById(`ram-txt-${id}`).innerText = ram + '%';
+        }
+
+        // Init
+        initScenario();
+
+    </script>
+</body>
+</html>
